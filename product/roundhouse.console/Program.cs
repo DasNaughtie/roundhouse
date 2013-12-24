@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Reflection;
 using log4net;
-using log4net.Core;
-using log4net.Repository;
-using log4net.Repository.Hierarchy;
 using roundhouse.consoles;
 using roundhouse.databases;
 using roundhouse.folders;
