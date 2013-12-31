@@ -27,7 +27,6 @@ namespace roundhouse.unittests
         [Test]
         public void Hash_WithString_ReturnsProperString()
         {
-
             var md5_crypto       = new MD5CryptographicService();
             string text_to_hash  = "I want to see what the freak is going on here";
             string expected_hash = "TMGPZJmBhSO5uYbf/TBqNA==";
