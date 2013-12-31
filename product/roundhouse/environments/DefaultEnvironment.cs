@@ -4,7 +4,7 @@ namespace roundhouse.environments
 {
     using infrastructure.app;
 
-    public sealed class DefaultEnvironment : Environment
+    public class DefaultEnvironment : Environment
     {
         public DefaultEnvironment(ConfigurationPropertyHolder configuration)
         {

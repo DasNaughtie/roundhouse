@@ -13,7 +13,7 @@ namespace roundhouse.infrastructure.filesystem
     /// <summary>
     /// All file system access code comes through here
     /// </summary>
-    public sealed class WindowsFileSystemAccess : FileSystemAccess
+    public class WindowsFileSystemAccess : FileSystemAccess
     {
         #region File
 

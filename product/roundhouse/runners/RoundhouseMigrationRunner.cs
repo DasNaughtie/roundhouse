@@ -65,9 +65,9 @@ namespace roundhouse.runners
 
             if (configuration.DryRun)
             {
-                this.get_bound_logger().log_an_info_event_containing("This is a dry run.");
+                this.log_info_event_on_bound_logger("This is a dry run.");
                 database_migrator.database.Dispose();
-                Console.ReadLine();
+                WaitForKeypress();
                 return;
             }
 
@@ -116,7 +116,7 @@ namespace roundhouse.runners
                     log_and_traverse(known_folders.permissions, version_id, new_version, ConnectionType.Default);
                     run_out_side_of_transaction_folder(known_folders.after_migration, version_id, new_version);
 
-                    this.get_bound_logger().log_an_info_event_containing(
+                    log_info_event_on_bound_logger(
                         "{0}{0}{1} v{2} has kicked your database ({3})! You are now at version {4}. All changes and backups can be found at \"{5}\".",
                         System.Environment.NewLine,
                         ApplicationParameters.name,
@@ -142,6 +142,21 @@ namespace roundhouse.runners
             }
         }
 
+        protected virtual void log_info_event_on_bound_logger(string message, params object[] args)
+        {
+            get_bound_logger().log_an_info_event_containing(message, args);
+        }
+
+        protected virtual void log_info_event_on_bound_logger(string message)
+        {
+            get_bound_logger().log_an_info_event_containing(message);
+        }
+
+        protected virtual void WaitForKeypress()
+        {
+            Console.ReadLine();
+        }
+
         protected virtual void initialize_database_connections()
         {
             this.database_migrator.initialize_connections();
@@ -155,7 +170,7 @@ namespace roundhouse.runners
         private void log_action_starting()
         {
             this.log_separation_line();
-            this.get_bound_logger().log_an_info_event_containing("Setup, Backup, Create/Restore/Drop");
+            log_info_event_on_bound_logger("Setup, Backup, Create/Restore/Drop");
             this.log_separation_line();
         }
 
@@ -194,18 +209,17 @@ namespace roundhouse.runners
         private void log_migration_scripts()
         {
             this.log_separation_line();
-            this.get_bound_logger().log_an_info_event_containing("Migration Scripts");
+            log_info_event_on_bound_logger("Migration Scripts");
             this.log_separation_line();
         }
 
         private long log_and_run_version_the_database(string new_version)
         {
             this.log_separation_line();
-            this.get_bound_logger().log_an_info_event_containing("Versioning");
+            log_info_event_on_bound_logger("Versioning");
             this.log_separation_line();
             string current_version = this.database_migrator.get_current_version(this.repository_path);
-            this.get_bound_logger()
-                .log_an_info_event_containing(
+            log_info_event_on_bound_logger(
                     " Migrating {0} from version {1} to {2}.",
                     this.database_migrator.database.database_name,
                     current_version,
@@ -217,14 +231,14 @@ namespace roundhouse.runners
         private void log_and_run_support_tasks()
         {
             this.log_separation_line();
-            this.get_bound_logger().log_an_info_event_containing("RoundhousE Structure");
+            log_info_event_on_bound_logger("RoundhousE Structure");
             this.log_separation_line();
             this.database_migrator.run_roundhouse_support_tasks();
         }
 
         private void log_separation_line()
         {
-            this.get_bound_logger().log_an_info_event_containing("{0}", "=".PadRight(50, '='));
+            log_info_event_on_bound_logger("{0}", "=".PadRight(50, '='));
         }
 
         private void create_change_drop_folder_and_log()
@@ -249,9 +263,8 @@ namespace roundhouse.runners
                         "You asked to run in a transaction, but this dabasetype doesn't support DDL transactions.");
                 if (!this.silent)
                 {
-                    this.get_bound_logger()
-                        .log_an_info_event_containing("Please press enter to continue without transaction support...");
-                    Console.ReadLine();
+                    log_info_event_on_bound_logger("Please press enter to continue without transaction support...");
+                    WaitForKeypress();
                 }
                 this.run_in_a_transaction = false;
             }
@@ -259,20 +272,18 @@ namespace roundhouse.runners
 
         private void log_initial_events()
         {
-            this.get_bound_logger()
-                .log_an_info_event_containing(
-                    "Running {0} v{1} against {2} - {3}.",
+            log_info_event_on_bound_logger("Running {0} v{1} against {2} - {3}.",
                     ApplicationParameters.name,
                     VersionInformation.get_current_assembly_version(),
                     this.database_migrator.database.server_name,
                     this.database_migrator.database.database_name);
 
-            this.get_bound_logger().log_an_info_event_containing("Looking in {0} for scripts to run.", this.known_folders.up.folder_path);
+            log_info_event_on_bound_logger("Looking in {0} for scripts to run.", this.known_folders.up.folder_path);
 
             if (!this.silent)
             {
-                this.get_bound_logger().log_an_info_event_containing("Please press enter when ready to kick...");
-                Console.ReadLine();
+                log_info_event_on_bound_logger("Please press enter when ready to kick...");
+                WaitForKeypress();
             }
         }
 
@@ -282,8 +293,7 @@ namespace roundhouse.runners
             this.database_migrator.delete_database();
             this.database_migrator.close_admin_connection();
             this.database_migrator.close_connection();
-            this.get_bound_logger()
-                .log_an_info_event_containing(
+            log_info_event_on_bound_logger(
                     "{0}{0}{1} has removed database ({2}). All changes and backups can be found at \"{3}\".",
                     System.Environment.NewLine,
                     ApplicationParameters.name,
@@ -308,15 +318,15 @@ namespace roundhouse.runners
 
         public void log_and_traverse(MigrationsFolder folder, long version_id, string new_version, ConnectionType connection_type)
         {
-            this.get_bound_logger().log_an_info_event_containing("{0}", "-".PadRight(50, '-'));
+            log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
 
-            this.get_bound_logger().log_an_info_event_containing("Looking for {0} scripts in \"{1}\".{2}{3}",
+            log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\".{2}{3}",
                                                             folder.friendly_name,
                                                             folder.folder_full_path,
                                                             folder.should_run_items_in_folder_once ? " These should be one time only scripts." : string.Empty,
                                                             folder.should_run_items_in_folder_every_time ? " These scripts will run every time" : string.Empty);
 
-            this.get_bound_logger().log_an_info_event_containing("{0}", "-".PadRight(50, '-'));
+            log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
             traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
         }
 
@@ -355,7 +365,7 @@ namespace roundhouse.runners
             return configuration.CreateDatabaseCustomScript;
         }
 
-        private void create_change_drop_folder()
+        protected virtual void create_change_drop_folder()
         {
             file_system.create_directory(known_folders.change_drop.folder_full_path);
         }
