@@ -5,7 +5,7 @@ namespace roundhouse.consoles
     using infrastructure.app;
     using infrastructure.logging;
 
-    public sealed class DefaultConfiguration : ConfigurationPropertyHolder
+    public class DefaultConfiguration : ConfigurationPropertyHolder
     {
         public Logger Logger { get; set; }
         public string ServerName { get; set; }

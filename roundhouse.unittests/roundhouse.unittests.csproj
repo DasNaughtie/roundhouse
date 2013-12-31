@@ -56,11 +56,40 @@
   <ItemGroup>
     <Compile Include="CryptographicServiceTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RoundhouseMigrationRunnerTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\product\roundhouse.databases.access\roundhouse.databases.access.csproj">
+      <Project>{35e058e3-8fee-4107-aedc-37a452c588ec}</Project>
+      <Name>roundhouse.databases.access</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\product\roundhouse.databases.mysql\roundhouse.databases.mysql.csproj">
+      <Project>{71419dbb-4809-4102-a002-d484242fcfc9}</Project>
+      <Name>roundhouse.databases.mysql</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\product\roundhouse.databases.oracle\roundhouse.databases.oracle.csproj">
+      <Project>{3828d379-c96a-49c8-8bc9-0182cc8c55b1}</Project>
+      <Name>roundhouse.databases.oracle</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\product\roundhouse.databases.postgresql\roundhouse.databases.postgresql.csproj">
+      <Project>{41ce538e-e6f1-4ab6-ab66-508def669a39}</Project>
+      <Name>roundhouse.databases.postgresql</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\product\roundhouse.databases.sqlite\roundhouse.databases.sqlite.csproj">
+      <Project>{1d41d70e-e310-4699-b7cb-c1f77476a685}</Project>
+      <Name>roundhouse.databases.sqlite</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\product\roundhouse.databases.sqlserver2000\roundhouse.databases.sqlserver2000.csproj">
+      <Project>{4cf5718b-9c74-4590-9848-a81360ae1d22}</Project>
+      <Name>roundhouse.databases.sqlserver2000</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\product\roundhouse.databases.sqlserver\roundhouse.databases.sqlserver.csproj">
+      <Project>{f02b7642-3ec4-4374-bbbe-7857a93ea5d9}</Project>
+      <Name>roundhouse.databases.sqlserver</Name>
+    </ProjectReference>
     <ProjectReference Include="..\product\roundhouse\roundhouse.csproj">
       <Project>{a95de649-d5ba-4402-9d9c-3d8d67e2ff44}</Project>
       <Name>roundhouse</Name>
