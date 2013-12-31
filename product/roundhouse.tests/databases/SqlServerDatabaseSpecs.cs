@@ -8,7 +8,6 @@ namespace roundhouse.tests.databases
     using developwithpassion.bdd.mbunit;
     using developwithpassion.bdd.mbunit.standard;
     using developwithpassion.bdd.mbunit.standard.observations;
-    using log4net;
     using roundhouse.databases;
     using roundhouse.databases.sqlserver;
     using roundhouse.infrastructure.app;
