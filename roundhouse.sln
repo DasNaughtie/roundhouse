@@ -41,7 +41,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{828B1E
 		.nuget\NuGet.targets = .nuget\NuGet.targets
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "roundhouse.unittests", "roundhouse.unittests\roundhouse.unittests.csproj", "{04008D23-4E7F-41FC-9F94-D5BFEFBFFA43}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "roundhouse.nunittests", "roundhouse.unittests\roundhouse.nunittests.csproj", "{04008D23-4E7F-41FC-9F94-D5BFEFBFFA43}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

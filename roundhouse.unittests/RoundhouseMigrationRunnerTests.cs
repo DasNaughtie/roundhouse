@@ -1,20 +1,20 @@
-﻿namespace roundhouse.unittests
+﻿using roundhouse.databases;
+using roundhouse.databases.access;
+using roundhouse.databases.sqlserver2000;
+
+namespace roundhouse.unittests
 {
-    using System.Text;
-
     using FakeItEasy;
-
     using NUnit.Framework;
-
     using roundhouse.consoles;
     using roundhouse.environments;
     using roundhouse.folders;
-    using roundhouse.infrastructure.extensions;
     using roundhouse.infrastructure.filesystem;
     using roundhouse.infrastructure.logging;
     using roundhouse.migrators;
     using roundhouse.resolvers;
     using roundhouse.runners;
+    using System.Text;
 
     public class TestableRoundhouseMigrationRunner : RoundhouseMigrationRunner
     {
@@ -49,7 +49,7 @@
 
         protected override Logger get_bound_logger()
         {
-            return this.mockLogger;
+            return mockLogger;
         }
 
         protected override void WaitForKeypress()
@@ -144,6 +144,109 @@
             sut.dont_create_the_database = false;
             sut.run();
             StringAssert.Contains("Creating the database using", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        [TestCase(RecoveryMode.Full, "Would have set the database recovery mode to Full on database DbName")]
+        [TestCase(RecoveryMode.Simple, "Would have set the database recovery mode to Simple on database DbName")]
+        public void Run_WithDryRun_WillNotSetRecoveryMode(RecoveryMode recoveryMode, string expected)
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            TestableRoundhouseMigrationRunner.mockConfiguration.RecoveryMode = recoveryMode;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.run();
+            StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        [TestCase(true, true, "Would have began a transaction on database DbName", null)]
+        [TestCase(true, false, null, "Would have began a transaction on database DbName")]
+        [TestCase(false, true, null, "Would have began a transaction on database DbName")]
+        [TestCase(false, false, null, "Would have began a transaction on database DbName")]
+        public void Run_WithDryRunAndTransactionRequestedAndDbThatSupportsTransactions_WillNotBeginTransactionInDatabase(
+            bool runInTransaction, 
+            bool supportsTransaction, 
+            string expected, 
+            string notExpected)
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            sut.run_in_a_transaction = runInTransaction;
+            if (supportsTransaction)
+            {
+                sut.database_migrator.database = new SqlServerDatabase();
+            }
+            else
+            {
+                sut.database_migrator.database = new AccessDatabase();
+            }
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.run();
+            if (string.IsNullOrEmpty(expected) == false)
+            {
+                StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
+            }
+            else
+            {
+                StringAssert.DoesNotContain(notExpected, sut.CheckLogWritten.ToString());
+            }
+        }
+
+        [Test]
+        [TestCase(true, true, null, "Would have began a transaction on database DbName")]
+        [TestCase(true, false, null, "Would have began a transaction on database DbName")]
+        [TestCase(false, true, null, "Would have began a transaction on database DbName")]
+        [TestCase(false, false, null, "Would have began a transaction on database DbName")]
+        public void Run_WithoutDryRunAndTransactionRequestedAndDbThatSupportsTransactions_WillBeginTransaction(
+            bool runInTransaction,
+            bool supportsTransaction,
+            string expected,
+            string notExpected)
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            sut.run_in_a_transaction = runInTransaction;
+            if (supportsTransaction)
+            {
+                sut.database_migrator.database = new SqlServerDatabase();
+            }
+            else
+            {
+                sut.database_migrator.database = new AccessDatabase();
+            }
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.run();
+            if (string.IsNullOrEmpty(expected) == false)
+            {
+                StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
+            }
+            else
+            {
+                StringAssert.DoesNotContain(notExpected, sut.CheckLogWritten.ToString());
+            }
+        }
+
+        [Test]
+        public void Run_WithDryRun_DoesntRunSupportTasks()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.run();
+            StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.run_roundhouse_support_tasks()).MustNotHaveHappened();
+        }
+
+        [Test]
+        public void Run_WithoutDryRun_RunsSupportTasks()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.run();
+            StringAssert.DoesNotContain("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
         }
 
     }
