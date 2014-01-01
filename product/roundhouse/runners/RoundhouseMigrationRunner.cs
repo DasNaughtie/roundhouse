@@ -23,7 +23,7 @@ namespace roundhouse.runners
         private readonly VersionResolver version_resolver;
         public bool silent { get; set; }
         public bool dropping_the_database { get; set; }
-        private readonly bool dont_create_the_database;
+        public bool dont_create_the_database;
         private bool run_in_a_transaction;
         private readonly bool use_simple_recovery;
         private readonly ConfigurationPropertyHolder configuration;
@@ -65,10 +65,9 @@ namespace roundhouse.runners
 
             if (configuration.DryRun)
             {
-                this.log_info_event_on_bound_logger("This is a dry run.");
+                this.log_info_event_on_bound_logger("This is a dry run, nothing will be done to the database.");
                 database_migrator.database.Dispose();
                 WaitForKeypress();
-                return;
             }
 
             handle_invalid_transaction_argument();
@@ -88,7 +87,7 @@ namespace roundhouse.runners
                 {
                     if (!dont_create_the_database)
                     {
-                        database_was_created = database_migrator.create_or_restore_database(get_custom_create_database_script());
+                        database_was_created = create_or_restore_the_database();
                     }
                     
                     if (configuration.RecoveryMode != RecoveryMode.NoChange)
@@ -140,14 +139,29 @@ namespace roundhouse.runners
             }
         }
 
+        protected virtual bool create_or_restore_the_database()
+        {
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("{0}{0}-DryRun- Would have created the database using this script: {1}",
+                    System.Environment.NewLine,
+                    this.get_custom_create_database_script()
+                    );
+                return false;
+            }
+            else
+            {
+                log_info_event_on_bound_logger("{0}{0} Creating the database using this script: {1}",
+                    System.Environment.NewLine,
+                    this.get_custom_create_database_script()
+                    );
+                return database_migrator.create_or_restore_database(this.get_custom_create_database_script());
+            }
+        }
+
         protected virtual void log_info_event_on_bound_logger(string message, params object[] args)
         {
             get_bound_logger().log_an_info_event_containing(message, args);
-        }
-
-        protected virtual void log_info_event_on_bound_logger(string message)
-        {
-            get_bound_logger().log_an_info_event_containing(message);
         }
 
         protected virtual void WaitForKeypress()
@@ -242,23 +256,21 @@ namespace roundhouse.runners
         private void create_change_drop_folder_and_log()
         {
             this.create_change_drop_folder();
-            this.get_bound_logger()
-                .log_a_debug_event_containing(
-                    "The change_drop (output) folder is: {0}",
-                    this.known_folders.change_drop.folder_full_path);
-            this.get_bound_logger()
-                .log_a_debug_event_containing(
-                    "Using SearchAllSubdirectoriesInsteadOfTraverse execution: {0}",
+            log_debug_event_on_bound_logger("The change_drop (output) folder is: {0}", this.known_folders.change_drop.folder_full_path);
+            log_debug_event_on_bound_logger("Using SearchAllSubdirectoriesInsteadOfTraverse execution: {0}",
                     this.configuration.SearchAllSubdirectoriesInsteadOfTraverse);
+        }
+
+        protected virtual void log_debug_event_on_bound_logger(string message, params object[] args)
+        {
+            this.get_bound_logger().log_a_debug_event_containing(message, args);
         }
 
         private void handle_invalid_transaction_argument()
         {
             if (this.run_in_a_transaction && !this.database_migrator.database.supports_ddl_transactions)
             {
-                this.get_bound_logger()
-                    .log_a_warning_event_containing(
-                        "You asked to run in a transaction, but this dabasetype doesn't support DDL transactions.");
+                log_warning_event_on_bound_logger("You asked to run in a transaction, but this dabasetype doesn't support DDL transactions.");
                 if (!this.silent)
                 {
                     log_info_event_on_bound_logger("Please press enter to continue without transaction support...");
@@ -266,6 +278,11 @@ namespace roundhouse.runners
                 }
                 this.run_in_a_transaction = false;
             }
+        }
+
+        protected virtual void log_warning_event_on_bound_logger(string message, params object[] args)
+        {
+            get_bound_logger().log_a_warning_event_containing(message, args);
         }
 
         private void log_initial_events()
@@ -285,18 +302,30 @@ namespace roundhouse.runners
             }
         }
 
-        private void drop_the_database()
+        protected virtual void drop_the_database()
         {
-            this.database_migrator.open_admin_connection();
-            this.database_migrator.delete_database();
-            this.database_migrator.close_admin_connection();
-            this.database_migrator.close_connection();
-            log_info_event_on_bound_logger(
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(
+                    "{0}{0}-DryRun-{1} would have removed database ({2}). All changes and backups would be found at \"{3}\".",
+                    System.Environment.NewLine,
+                    ApplicationParameters.name,
+                    this.database_migrator.database.database_name,
+                    this.known_folders.change_drop.folder_full_path);
+            }
+            else
+            {
+                this.database_migrator.open_admin_connection();
+                this.database_migrator.delete_database();
+                this.database_migrator.close_admin_connection();
+                this.database_migrator.close_connection();
+                log_info_event_on_bound_logger(
                     "{0}{0}{1} has removed database ({2}). All changes and backups can be found at \"{3}\".",
                     System.Environment.NewLine,
                     ApplicationParameters.name,
                     this.database_migrator.database.database_name,
                     this.known_folders.change_drop.folder_full_path);
+            }
         }
 
         private void log_exception_and_throw(Exception ex)
@@ -350,13 +379,19 @@ namespace roundhouse.runners
 
         private void create_share_and_set_permissions_for_change_drop_folder()
         {
-            //todo: implement creating share with change permissions
-            //todo: implement setting Everyone to full acess to this folder
+            if (!configuration.DryRun)
+            {
+                //todo: implement creating share with change permissions
+                //todo: implement setting Everyone to full acess to this folder
+            }
         }
 
         private void remove_share_from_change_drop_folder()
         {
-            //todo: implement removal of the file share
+            if (!configuration.DryRun)
+            {
+                //todo: implement removal of the file share
+            }
         }
 
         //todo:down story
@@ -372,7 +407,7 @@ namespace roundhouse.runners
             foreach (string sql_file in fileNames)
             {
                 string sql_file_text = replace_tokens(get_file_text(sql_file));
-                this.get_bound_logger().log_a_debug_event_containing(" Found and running {0}.", sql_file);
+                log_debug_event_on_bound_logger(" Found and running {0}.", sql_file);
                 bool the_sql_ran = database_migrator.run_sql(sql_file_text, file_system.get_file_name_from(sql_file),
                                                              migration_folder.should_run_items_in_folder_once,
                                                              migration_folder.should_run_items_in_folder_every_time,
@@ -385,7 +420,7 @@ namespace roundhouse.runners
                     }
                     catch (Exception ex)
                     {
-                        this.get_bound_logger().log_a_warning_event_containing("Unable to copy {0} to {1}. {2}{3}", sql_file, migration_folder.folder_full_path,
+                        log_warning_event_on_bound_logger("Unable to copy {0} to {1}. {2}{3}", sql_file, migration_folder.folder_full_path,
                                                                           System.Environment.NewLine, ex.to_string());
                     }
                 }
@@ -420,7 +455,7 @@ namespace roundhouse.runners
                 string destination_file = file_system.combine_paths(known_folders.change_drop.folder_full_path, "itemsRan",
                                                                     sql_file_ran.Replace(migration_folder.folder_path + "\\", string.Empty));
                 file_system.verify_or_create_directory(file_system.get_directory_name_from(destination_file));
-                this.get_bound_logger().log_a_debug_event_containing("Copying file {0} to {1}.", file_system.get_file_name_from(sql_file_ran), destination_file);
+                log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(sql_file_ran), destination_file);
                 file_system.file_copy_unsafe(sql_file_ran, destination_file, true);
             }
         }

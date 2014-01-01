@@ -29,6 +29,7 @@
         // Quick stub checks
         public bool CheckChangeDropFolderCreated = false;
         public StringBuilder CheckLogWritten     = new StringBuilder();
+        public StringBuilder CheckWarningWritten = new StringBuilder();
 
         public TestableRoundhouseMigrationRunner()
             : base("repo_path",
@@ -63,12 +64,14 @@
 
         protected override void log_info_event_on_bound_logger(string message, params object[] args)
         {
-            CheckLogWritten.Append(string.Format(message, args));
+            CheckLogWritten.AppendFormat(message, args);
         }
-        protected override void log_info_event_on_bound_logger(string message)
+
+        protected override void log_warning_event_on_bound_logger(string message, params object[] args)
         {
-            CheckLogWritten.Append(string.Format(message));
+            CheckWarningWritten.AppendFormat(message, args);
         }
+
     }
 
     [TestFixture]
@@ -85,13 +88,63 @@
         }
 
         [Test]
-        public void Run_WithDryRunConfiguration_LogsThatItIsADryRun()
+        [TestCase(true, "This is a dry run", true)]
+        [TestCase(false, "This is a dry run", false)]
+        public void Run_WithOrWithoutDryRun_LogsAppropriateInfoActions(bool isDryRun, string testString, bool shouldContain)
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = isDryRun;
+            sut.run();
+            if (shouldContain)
+            {
+                StringAssert.Contains(testString, sut.CheckLogWritten.ToString());
+            }
+            else
+            {
+                StringAssert.DoesNotContain(testString, sut.CheckLogWritten.ToString());
+            }
+        }
+
+        [Test]
+        public void Run_WithDryRun_WillNotDropDatabase()
         {
             var sut = new TestableRoundhouseMigrationRunner();
             TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            sut.dropping_the_database = true;
             sut.run();
-            StringAssert.Contains("This is a dry run", sut.CheckLogWritten.ToString());
-            Assert.AreEqual(false, sut.CheckChangeDropFolderCreated);
+            StringAssert.Contains("would have removed database", sut.CheckLogWritten.ToString());
         }
+
+        [Test]
+        public void Run_WithoutDryRun_WillDropDatabase()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            sut.dropping_the_database = true;
+            sut.run();
+            A.CallTo(() => sut.database_migrator.delete_database()).WithAnyArguments().MustHaveHappened();
+            StringAssert.Contains("has removed database", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithDryRun_WillNotCreateTheDatabase()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            sut.dont_create_the_database = false;
+            sut.run();
+            StringAssert.Contains("Would have created the database", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithoutDryRun_WillCreateTheDatabase()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            sut.dont_create_the_database = false;
+            sut.run();
+            StringAssert.Contains("Creating the database using", sut.CheckLogWritten.ToString());
+        }
+
     }
 }
