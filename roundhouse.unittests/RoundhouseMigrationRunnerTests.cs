@@ -235,7 +235,6 @@ namespace roundhouse.unittests
             TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
             sut.run();
             StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.run_roundhouse_support_tasks()).MustNotHaveHappened();
         }
 
         [Test]
@@ -246,8 +245,35 @@ namespace roundhouse.unittests
             TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
             sut.run();
             StringAssert.DoesNotContain("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
+            // This line doesn't prove much becauset he mock is static and has history from the other tests.
+            // A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
         }
+
+        [Test]
+        public void Run_WithDryRun_DoesNotInsertNewVersionRowIntoTheDatabase()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            sut.run();
+            StringAssert.Contains("Would have migrated database DbName from version 1 to 2", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithoutDryRun_DoesInsertNewVersionRowIntoTheDatabase()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            sut.run();
+            StringAssert.Contains("Migrating DbName from version 1 to 2", sut.CheckLogWritten.ToString());
+        }
+
+
 
     }
 }
