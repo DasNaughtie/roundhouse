@@ -1,3 +1,5 @@
+using NHibernate.Cfg;
+
 namespace roundhouse.runners
 {
     using System;
@@ -24,7 +26,7 @@ namespace roundhouse.runners
         public bool silent { get; set; }
         public bool dropping_the_database { get; set; }
         public bool dont_create_the_database;
-        private bool run_in_a_transaction;
+        public bool run_in_a_transaction;
         private readonly bool use_simple_recovery;
         private readonly ConfigurationPropertyHolder configuration;
         private const string SQL_EXTENSION = "*.sql";
@@ -90,13 +92,9 @@ namespace roundhouse.runners
                         database_was_created = create_or_restore_the_database();
                     }
                     
-                    if (configuration.RecoveryMode != RecoveryMode.NoChange)
-                    {
-                        database_migrator.set_recovery_mode(configuration.RecoveryMode == RecoveryMode.Simple);
-                    }
+                    set_database_recovery_mode();
 
-
-                    database_migrator.open_connection(run_in_a_transaction);
+                    open_connection_in_transaction_if_needed();
 
                     log_and_run_support_tasks();
 
@@ -136,6 +134,38 @@ namespace roundhouse.runners
             {
                 database_migrator.database.Dispose();
                 //copy_log_file_to_change_drop_folder();
+            }
+        }
+
+        private void open_connection_in_transaction_if_needed()
+        {
+            if (configuration.DryRun && run_in_a_transaction)
+            {
+                log_info_event_on_bound_logger("{0}{0}-DryRun- Would have began a transaction on database {1}", 
+                    System.Environment.NewLine,
+                    database_migrator.database.database_name);
+            }
+            else if (!configuration.DryRun)
+            {
+                database_migrator.open_connection(run_in_a_transaction);
+            }
+        }
+
+        protected virtual void set_database_recovery_mode()
+        {
+            if (configuration.DryRun)
+            {
+                if (configuration.RecoveryMode != RecoveryMode.NoChange)
+                {
+                    log_info_event_on_bound_logger("{0}{0}-DryRun- Would have set the database recovery mode to {1} on database {2}", 
+                        System.Environment.NewLine,
+                        configuration.RecoveryMode == RecoveryMode.Simple ? "Simple" : "Full",
+                        database_migrator.database.database_name);
+                }
+            } 
+            else if (configuration.RecoveryMode != RecoveryMode.NoChange)
+            {
+                database_migrator.set_recovery_mode(configuration.RecoveryMode == RecoveryMode.Simple);
             }
         }
 
@@ -245,7 +275,17 @@ namespace roundhouse.runners
             this.log_separation_line();
             log_info_event_on_bound_logger("RoundhousE Structure");
             this.log_separation_line();
-            this.database_migrator.run_roundhouse_support_tasks();
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("{0}{0}-DryRun- Would have run roundhouse support tasks on database {1}",
+                    System.Environment.NewLine,
+                    database_migrator.database.database_name
+                    );
+            }
+            else
+            {
+                database_migrator.run_roundhouse_support_tasks();
+            }
         }
 
         private void log_separation_line()

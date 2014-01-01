@@ -27,6 +27,7 @@
     <exclude name="lib${path.separator}**" />
     <exclude name="**${path.separator}*Database*dll" />
     <exclude name="**${path.separator}*.Integration*dll" />
+    <exclude name="**${path.separator}*.nunit*dll" />
     <exclude name="**${path.separator}TestFu.dll" />
     <include name="**${path.separator}*Test*dll" />
     <include name="**${path.separator}*.Spec*dll" />
@@ -35,6 +36,7 @@
   <assemblyfileset id="assemblies.assemblyfileset.testing.all" basedir="${dirs.build.code}${path.separator}" >
     <exclude name="lib${path.separator}**" />
     <exclude name="**${path.separator}TestFu.dll" />
+    <exclude name="**${path.separator}*.nunit*dll" />
     <include name="**${path.separator}*Test*dll" />
     <include name="**${path.separator}*.Spec*dll" />
   </assemblyfileset>
