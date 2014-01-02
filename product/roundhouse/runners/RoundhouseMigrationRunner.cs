@@ -219,16 +219,16 @@ namespace roundhouse.runners
 
         private void log_and_traverse_known_folders(long version_id, string new_version, bool database_was_created)
         {
-            this.log_and_traverse_alter_database_scripts(version_id, new_version);
-            this.log_and_traverse_after_create_database_scripts(database_was_created, version_id, new_version);
-            this.log_and_traverse(this.known_folders.run_before_up, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.up, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.run_first_after_up, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.functions, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.views, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.sprocs, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.indexes, version_id, new_version, ConnectionType.Default);
-            this.log_and_traverse(this.known_folders.run_after_other_any_time_scripts, version_id, new_version, ConnectionType.Default);
+            log_and_traverse_alter_database_scripts(version_id, new_version);
+            log_and_traverse_after_create_database_scripts(database_was_created, version_id, new_version);
+            log_and_traverse(known_folders.run_before_up, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.up, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.run_first_after_up, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.functions, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.views, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.sprocs, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.indexes, version_id, new_version, ConnectionType.Default);
+            log_and_traverse(known_folders.run_after_other_any_time_scripts, version_id, new_version, ConnectionType.Default);
         }
 
         private void log_and_traverse_after_create_database_scripts(
@@ -238,22 +238,22 @@ namespace roundhouse.runners
         {
             if (database_was_created)
             {
-                this.log_and_traverse(this.known_folders.run_after_create_database, version_id, new_version, ConnectionType.Default);
+                log_and_traverse(known_folders.run_after_create_database, version_id, new_version, ConnectionType.Default);
             }
         }
 
-        private void log_and_traverse_alter_database_scripts(long version_id, string new_version)
+        protected virtual void log_and_traverse_alter_database_scripts(long version_id, string new_version)
         {
-            this.database_migrator.open_admin_connection();
-            this.log_and_traverse(this.known_folders.alter_database, version_id, new_version, ConnectionType.Admin);
-            this.database_migrator.close_admin_connection();
+            database_migrator.open_admin_connection();
+            log_and_traverse(known_folders.alter_database, version_id, new_version, ConnectionType.Admin);
+            database_migrator.close_admin_connection();
         }
 
         private void log_migration_scripts()
         {
-            this.log_separation_line();
+            log_separation_line();
             log_info_event_on_bound_logger("Migration Scripts");
-            this.log_separation_line();
+            log_separation_line();
         }
 
         private long log_and_run_version_the_database(string new_version)
@@ -401,14 +401,28 @@ namespace roundhouse.runners
         {
             log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
 
-            log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\".{2}{3}",
-                                                            folder.friendly_name,
-                                                            folder.folder_full_path,
-                                                            folder.should_run_items_in_folder_once ? " These should be one time only scripts." : string.Empty,
-                                                            folder.should_run_items_in_folder_every_time ? " These scripts will run every time" : string.Empty);
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("-DryRun- Would have been looking for {0} scripts in \"{1}\".{2}{3}",
+                                                                folder.friendly_name,
+                                                                folder.folder_full_path,
+                                                                folder.should_run_items_in_folder_once ? " These would be one time only scripts." : string.Empty,
+                                                                folder.should_run_items_in_folder_every_time ? " These scripts would be run every time" : string.Empty);
 
-            log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
-            traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
+                log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
+                //traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
+            }
+            else
+            {
+                log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\".{2}{3}",
+                                                                folder.friendly_name,
+                                                                folder.folder_full_path,
+                                                                folder.should_run_items_in_folder_once ? " These should be one time only scripts." : string.Empty,
+                                                                folder.should_run_items_in_folder_every_time ? " These scripts will run every time" : string.Empty);
+
+                log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
+                traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
+            }
         }
 
         public void run_out_side_of_transaction_folder(MigrationsFolder folder, long version_id, string new_version)

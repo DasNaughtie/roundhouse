@@ -1,4 +1,6 @@
-﻿using roundhouse.databases;
+﻿using System;
+using System.Collections.ObjectModel;
+using roundhouse.databases;
 using roundhouse.databases.access;
 using roundhouse.databases.sqlserver2000;
 
@@ -273,7 +275,34 @@ namespace roundhouse.unittests
             StringAssert.Contains("Migrating DbName from version 1 to 2", sut.CheckLogWritten.ToString());
         }
 
+        [Test]
+        public void Run_WithDryRun_DoesNotLogAndTraverseFolders()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
+            sut.run();
+            StringAssert.Contains("Would have been looking for friendly-alter scripts in \"folderpath\\alter\". These scripts would be run every time", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Would have been looking for friendly-functions scripts in \"folderpath\\functions\". These would be one time only scripts", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithoutDryRun_DoesLogAndTraverseFolders()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
+            sut.run();
+            StringAssert.Contains("Looking for friendly-alter scripts in \"folderpath\\alter\". These scripts will be run every time", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Looking for friendly-functions scripts in \"folderpath\\functions\". These should be one time only scripts", sut.CheckLogWritten.ToString());
+        }
 
 
+        private MigrationsFolder MakeMigrationsFolder(string folderName, bool oneTime, bool everyTime)
+        {
+            return new DefaultMigrationsFolder(A.Dummy<WindowsFileSystemAccess>(), "folderpath", folderName, oneTime, everyTime, "friendly-" + folderName);
+        }
     }
 }
