@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using roundhouse.databases;
+﻿using roundhouse.databases;
 using roundhouse.databases.access;
 using roundhouse.databases.sqlserver2000;
 
@@ -295,7 +293,7 @@ namespace roundhouse.unittests
             A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
             A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
             sut.run();
-            StringAssert.Contains("Looking for friendly-alter scripts in \"folderpath\\alter\". These scripts will be run every time", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Looking for friendly-alter scripts in \"folderpath\\alter\". These scripts will run every time", sut.CheckLogWritten.ToString());
             StringAssert.Contains("Looking for friendly-functions scripts in \"folderpath\\functions\". These should be one time only scripts", sut.CheckLogWritten.ToString());
         }
 
