@@ -66,8 +66,6 @@ namespace roundhouse.runners
             if (configuration.DryRun)
             {
                 this.log_info_event_on_bound_logger("This is a dry run, nothing will be done to the database.");
-                database_migrator.database.Dispose();
-                WaitForKeypress();
             }
 
             handle_invalid_transaction_argument();
@@ -104,19 +102,42 @@ namespace roundhouse.runners
 
                     if (run_in_a_transaction)
                     {
-                        database_migrator.close_connection();
-                        database_migrator.open_connection(false);
+                        if (configuration.DryRun)
+                        {
+                            this.log_info_event_on_bound_logger("{0}-DryRun-Would have committed the transaction on database {1}", 
+                                System.Environment.NewLine,
+                                database_migrator.database.database_name);                            
+                        }
+                        else
+                        {
+                            database_migrator.close_connection();
+                            database_migrator.open_connection(false);
+                        }
                     }
                     log_and_traverse(known_folders.permissions, version_id, new_version, ConnectionType.Default);
 
-                    log_info_event_on_bound_logger(
-                        "{0}{0}{1} v{2} has kicked your database ({3})! You are now at version {4}. All changes and backups can be found at \"{5}\".",
-                        System.Environment.NewLine,
-                        ApplicationParameters.name,
-                        VersionInformation.get_current_assembly_version(),
-                        database_migrator.database.database_name,
-                        new_version,
-                        known_folders.change_drop.folder_full_path);
+                    if (configuration.DryRun)
+                    {
+                        log_info_event_on_bound_logger(
+                            "{0}{0}-DryRun-{1} v{2} would have kicked your database ({3})! You would be at version {4}. All changes and backups can be found at \"{5}\".",
+                            System.Environment.NewLine,
+                            ApplicationParameters.name,
+                            VersionInformation.get_current_assembly_version(),
+                            database_migrator.database.database_name,
+                            new_version,
+                            known_folders.change_drop.folder_full_path);
+                    }
+                    else
+                    {
+                        log_info_event_on_bound_logger(
+                            "{0}{0}{1} v{2} has kicked your database ({3})! You are now at version {4}. All changes and backups can be found at \"{5}\".",
+                            System.Environment.NewLine,
+                            ApplicationParameters.name,
+                            VersionInformation.get_current_assembly_version(),
+                            database_migrator.database.database_name,
+                            new_version,
+                            known_folders.change_drop.folder_full_path);
+                    }
                     database_migrator.close_connection();
                 }
                 else
