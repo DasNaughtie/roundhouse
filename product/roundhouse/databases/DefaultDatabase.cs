@@ -286,8 +286,9 @@ namespace roundhouse.databases
             }
             catch (Exception)
             {
-                Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for retrieving versions at this time.",
-                                                                  GetType(), provider);
+                Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for " +
+                    "retrieving versions at this time.",
+                    GetType(), provider);
             }
 
             return version;

@@ -297,6 +297,39 @@ namespace roundhouse.unittests
             StringAssert.Contains("Looking for friendly-functions scripts in \"folderpath\\functions\". These should be one time only scripts", sut.CheckLogWritten.ToString());
         }
 
+        [Test]
+        public void Run_WithoutDryRun_TellsYouYourDatabaseWasKicked()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
+                .Returns(MakeMigrationsFolder("change_drop", true, false));
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            sut.run();
+            StringAssert.IsMatch("RoundhousE v([0-9.]*) has kicked your database \\(DbName\\)\\! You are now at version 2\\. All changes and backups can be found at \"folderpath\\\\change_drop\"", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithDryRun_TellsYouYourDatabaseWouldHaveBeenKicked()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
+                .Returns(MakeMigrationsFolder("change_drop", true, false));
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            sut.run();
+            StringAssert.IsMatch("-DryRun-RoundhousE v([0-9.]*) would have kicked your database \\(DbName\\)\\! You would be at version 2\\. All changes and backups can be found at \"folderpath\\\\change_drop\"", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithoutDryRunAndDatabaseDropRequested_DropsTheDatabase()
+        {
+           Assert.AreEqual(true, false); 
+        }
 
         private MigrationsFolder MakeMigrationsFolder(string folderName, bool oneTime, bool everyTime)
         {
