@@ -66,6 +66,7 @@ namespace roundhouse.runners
             if (configuration.DryRun)
             {
                 this.log_info_event_on_bound_logger("This is a dry run, nothing will be done to the database.");
+                WaitForKeypress();
             }
 
             handle_invalid_transaction_argument();
@@ -145,7 +146,7 @@ namespace roundhouse.runners
                 }
                 else
                 {
-                    this.drop_the_database();
+                    drop_the_database();
                 }
             }
             catch (Exception ex)
@@ -287,7 +288,7 @@ namespace roundhouse.runners
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(
-                        " -DryRun- Would have migrated database {0} from version {1} to {2}.",
+                        "-DryRun- Would have migrated database {0} from version {1} to {2}.",
                         this.database_migrator.database.database_name,
                         current_version,
                         new_version);
@@ -316,6 +317,8 @@ namespace roundhouse.runners
                     System.Environment.NewLine,
                     database_migrator.database.database_name
                     );
+
+
             }
             else
             {

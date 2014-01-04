@@ -284,11 +284,14 @@ namespace roundhouse.databases
                     version = items[0].version;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for " +
                     "retrieving versions at this time.",
                     GetType(), provider);
+
+                Log.bound_to(this).log_a_warning_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
+                    GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
             }
 
             return version;
