@@ -106,16 +106,6 @@ namespace roundhouse.unittests
         }
 
         [Test]
-        public void Run_WithDryRun_WillNotDropDatabase()
-        {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            sut.dropping_the_database = true;
-            sut.run();
-            StringAssert.Contains("would have removed database", sut.CheckLogWritten.ToString());
-        }
-
-        [Test]
         public void Run_WithoutDryRun_WillDropDatabase()
         {
             var sut = new TestableRoundhouseMigrationRunner();
@@ -328,7 +318,31 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRunAndDatabaseDropRequested_DropsTheDatabase()
         {
-           Assert.AreEqual(true, false); 
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.dropping_the_database = true;
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
+                .Returns(MakeMigrationsFolder("change_drop", true, false));
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            sut.run();
+            StringAssert.Contains("RoundhousE has removed database (DbName). All changes and backups can be found at \"folderpath\\change_drop\"", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithDryRunAndDatabaseDropRequested_DoesntDropTheDatabase()
+        {
+            var sut = new TestableRoundhouseMigrationRunner();
+            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.dropping_the_database = true;
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
+                .Returns(MakeMigrationsFolder("change_drop", true, false));
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            sut.run();
+            StringAssert.Contains("-DryRun-RoundhousE would have removed database (DbName). All changes and backups would be found at \"folderpath\\change_drop\"", sut.CheckLogWritten.ToString());
         }
 
         private MigrationsFolder MakeMigrationsFolder(string folderName, bool oneTime, bool everyTime)

@@ -12,18 +12,22 @@ namespace roundhouse.migrators
     using sqlsplitters;
     using Environment = roundhouse.environments.Environment;
 
-    public sealed class DefaultDatabaseMigrator : DatabaseMigrator
+    public class DefaultDatabaseMigrator : DatabaseMigrator
     {
         public Database database { get; set; }
-        private readonly CryptographicService crypto_provider;
-        private readonly ConfigurationPropertyHolder configuration;
-        private readonly bool restoring_database;
-        private readonly string restore_path;
-        private readonly string custom_restore_options;
-        private readonly string output_path;
-        private readonly bool error_on_one_time_script_changes;
-        private bool running_in_a_transaction;
-        private readonly bool is_running_all_any_time_scripts;
+
+        public bool is_running_a_dry_run { get; set; }
+
+        protected CryptographicService crypto_provider;
+        protected ConfigurationPropertyHolder configuration;
+        protected bool restoring_database;
+        protected string restore_path;
+        protected string custom_restore_options;
+        protected string output_path;
+        protected bool error_on_one_time_script_changes;
+        protected bool running_in_a_transaction;
+        protected bool is_running_all_any_time_scripts;
+
 
         public DefaultDatabaseMigrator(Database database, CryptographicService crypto_provider, ConfigurationPropertyHolder configuration)
         {
