@@ -68,20 +68,21 @@ namespace roundhouse.migrators
             database.close_connection();
         }
 
+        protected virtual void log_info_event_on_bound_logger(string message, params object[] args)
+        {
+            Log.bound_to(this).log_an_info_event_containing(message, args);
+        }
+
         public bool create_or_restore_database(string custom_create_database_script)
         {
             var database_created = false;
 
-            if (string.IsNullOrEmpty(custom_create_database_script))
-            {
-                Log.bound_to(this).log_an_info_event_containing("Creating {0} database on {1} server if it doesn't exist.", database.database_name, database.server_name);
-            }
-            else
-            {
-                Log.bound_to(this).log_an_info_event_containing("Creating {0} database on {1} server with custom script.", database.database_name, database.server_name);
-            }
+            log_what_we_are_about_to_do_create_or_restore(custom_create_database_script);
 
-            database_created = database.create_database_if_it_doesnt_exist(custom_create_database_script);
+            if (configuration.DryRun == false)
+            {
+                database_created = database.create_database_if_it_doesnt_exist(custom_create_database_script);
+            }
 
             if (restoring_database)
             {
@@ -97,6 +98,40 @@ namespace roundhouse.migrators
             return database_created;
         }
 
+        private void log_what_we_are_about_to_do_create_or_restore(string custom_create_database_script)
+        {
+
+            if (configuration.DryRun)
+            {
+                if (string.IsNullOrEmpty(custom_create_database_script))
+                {
+                    this.log_info_event_on_bound_logger(
+                        "-DryRun-Would have created {0} database on {1} server (if it didn't exist).",
+                        this.database.database_name,
+                        this.database.server_name);
+                }
+                else
+                {
+                    this.log_info_event_on_bound_logger(
+                        "-DryRun-Would have created {0} database on {1} server with custom script.",
+                        this.database.database_name,
+                        this.database.server_name);
+                }
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(custom_create_database_script))
+                {
+                    log_info_event_on_bound_logger("Creating {0} database on {1} server if it doesn't exist.", database.database_name, database.server_name);
+                }
+                else
+                {
+                    log_info_event_on_bound_logger("Creating {0} database on {1} server with custom script.", database.database_name, database.server_name);
+                }
+
+            }
+        }
+
         public void backup_database_if_it_exists()
         {
             database.backup_database(output_path);
@@ -104,14 +139,21 @@ namespace roundhouse.migrators
 
         public void restore_database(string restore_from_path, string restore_options)
         {
-            Log.bound_to(this).log_an_info_event_containing("Restoring {0} database on {1} server from path {2}.", database.database_name, database.server_name, restore_from_path);
-            database.restore_database(restore_from_path, restore_options);
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("-DryRun-Would have restored {0} database on {1} server from path {2}.", database.database_name, database.server_name, restore_from_path);
+            }
+            else
+            {
+                log_info_event_on_bound_logger("Restoring {0} database on {1} server from path {2}.", database.database_name, database.server_name, restore_from_path);
+                database.restore_database(restore_from_path, restore_options);
+            }
         }
 
         public void set_recovery_mode(bool simple)
         {
             //database.open_connection(false);
-            Log.bound_to(this).log_an_info_event_containing("Setting recovery mode to '{0}' for database {1}.", simple ? "Simple":"Full", database.database_name );
+            log_info_event_on_bound_logger("Setting recovery mode to '{0}' for database {1}.", simple ? "Simple":"Full", database.database_name );
             database.set_recovery_mode(simple);
             //database.close_connection();
         }
@@ -124,11 +166,11 @@ namespace roundhouse.migrators
                 database.open_connection(false);
             }
 
-            Log.bound_to(this).log_an_info_event_containing(" Running database type specific tasks.");
+            log_info_event_on_bound_logger(" Running database type specific tasks.");
             database.run_database_specific_tasks();
-            Log.bound_to(this).log_an_info_event_containing(" Creating [{0}] table if it doesn't exist.", database.version_table_name);
-            Log.bound_to(this).log_an_info_event_containing(" Creating [{0}] table if it doesn't exist.", database.scripts_run_table_name);
-            Log.bound_to(this).log_an_info_event_containing(" Creating [{0}] table if it doesn't exist.", database.scripts_run_errors_table_name);
+            log_info_event_on_bound_logger(" Creating [{0}] table if it doesn't exist.", database.version_table_name);
+            log_info_event_on_bound_logger(" Creating [{0}] table if it doesn't exist.", database.scripts_run_table_name);
+            log_info_event_on_bound_logger(" Creating [{0}] table if it doesn't exist.", database.scripts_run_errors_table_name);
             database.create_or_update_roundhouse_tables();
 
             if (running_in_a_transaction)
@@ -153,13 +195,13 @@ namespace roundhouse.migrators
 
         public void delete_database()
         {
-            Log.bound_to(this).log_an_info_event_containing("Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
+            log_info_event_on_bound_logger("Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
             database.delete_database_if_it_exists();
         }
 
         public long version_the_database(string repository_path, string repository_version)
         {
-            Log.bound_to(this).log_an_info_event_containing(" Versioning {0} database with version {1} based on {2}.", database.database_name, repository_version, repository_path);
+            log_info_event_on_bound_logger(" Versioning {0} database with version {1} based on {2}.", database.database_name, repository_version, repository_path);
             return database.insert_version_and_get_version_id(repository_path, repository_version);
         }
 
@@ -183,7 +225,7 @@ namespace roundhouse.migrators
             if (this_is_an_environment_file_and_its_in_the_right_environment(script_name, environment)
                 && this_script_should_run(script_name, sql_to_run, run_this_script_once, run_this_script_every_time))
             {
-                Log.bound_to(this).log_an_info_event_containing(" Running {0} on {1} - {2}.", script_name, database.server_name, database.database_name);
+                log_info_event_on_bound_logger(" Running {0} on {1} - {2}.", script_name, database.server_name, database.database_name);
 
                 foreach (var sql_statement in get_statements_to_run(sql_to_run))
                 {
@@ -206,7 +248,7 @@ namespace roundhouse.migrators
             }
             else
             {
-                Log.bound_to(this).log_an_info_event_containing(" Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
+                log_info_event_on_bound_logger(" Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
             }
 
             return this_sql_ran;
@@ -376,7 +418,7 @@ namespace roundhouse.migrators
                 environment_file_is_in_the_right_environment = true;
             }
 
-            Log.bound_to(this).log_an_info_event_containing(" {0} is an environment file. We are in the {1} environment. This will{2} run based on this check.",
+            log_info_event_on_bound_logger(" {0} is an environment file. We are in the {1} environment. This will{2} run based on this check.",
                                                             script_name, environment.name, environment_file_is_in_the_right_environment ? string.Empty : " NOT");
 
             return environment_file_is_in_the_right_environment;
