@@ -110,7 +110,6 @@ namespace roundhouse.migrators
 
         private void log_what_we_are_about_to_do_create_or_restore(string custom_create_database_script)
         {
-
             if (configuration.DryRun)
             {
                 if (string.IsNullOrEmpty(custom_create_database_script))
@@ -200,10 +199,14 @@ namespace roundhouse.migrators
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(" -DryRun-Would run database type specific tasks.");
-                database.run_database_specific_tasks();
+                // TODO (PMO): Overselling my hand?
+                log_info_event_on_bound_logger("  Warning: If RoundhousE support tables aren't in this database the information");
+                log_info_event_on_bound_logger("           in this dry run will be unreliable.");
+                //database.run_database_specific_tasks();
                 log_info_event_on_bound_logger(" -DryRun-Would create [{0}] table if it didn't exist.", database.version_table_name);
                 log_info_event_on_bound_logger(" -DryRun-Would create [{0}] table if it didn't exist.", database.scripts_run_table_name);
                 log_info_event_on_bound_logger(" -DryRun-Would create [{0}] table if it didn't exist.", database.scripts_run_errors_table_name);
+                // TODO (PMO): Make sure the RoundHouse support tasks make it into the drop folder
             }
             else
             {
@@ -252,13 +255,13 @@ namespace roundhouse.migrators
         {
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger(" -DryRun-Would version {0} database with version {1} based on {2}.", database.database_name, repository_version, repository_path);
+                log_info_event_on_bound_logger(" -DryRun-Would version {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
                 // TODO (PMO): Make it return a realistic version number
                 return 0;
             }
             else
             {
-                log_info_event_on_bound_logger(" Versioning {0} database with version {1} based on {2}.", database.database_name, repository_version, repository_path);
+                log_info_event_on_bound_logger(" Versioning {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
                 return database.insert_version_and_get_version_id(repository_path, repository_version);
             }
         }
@@ -267,8 +270,7 @@ namespace roundhouse.migrators
         {
             bool this_sql_ran = false;
 
-            handle_one_time_already_run(sql_to_run, script_name, 
-                run_this_script_once, repository_version, repository_path);
+            handle_one_time_already_run(sql_to_run, script_name, run_this_script_once, repository_version, repository_path);
 
             if (this_is_an_environment_file_and_its_in_the_right_environment(script_name, environment)
                 && this_script_should_run(script_name, sql_to_run, run_this_script_once, run_this_script_every_time))
@@ -278,7 +280,7 @@ namespace roundhouse.migrators
             }
             else
             {
-                log_info_event_on_bound_logger(" Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
+                log_info_event_on_bound_logger("    Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
             }
 
             return this_sql_ran;
@@ -296,7 +298,7 @@ namespace roundhouse.migrators
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(
-                    " -DryRun-Would have run {0} on {1} - {2}.",
+                    "  * Would have run {0} on {1} - {2}.",
                     script_name,
                     database.server_name,
                     database.database_name);
@@ -306,7 +308,7 @@ namespace roundhouse.migrators
             else
             {
                 log_info_event_on_bound_logger(
-                    " Running {0} on {1} - {2}.",
+                    "  * Running {0} on {1} - {2}.",
                     script_name,
                     database.server_name,
                     database.database_name);
@@ -486,9 +488,13 @@ namespace roundhouse.migrators
             {
                 old_text_hash = database.get_current_script_hash(script_name);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                log_warning_event_on_bound_logger("{0} - I didn't find this script executed before.", script_name);
+                log_warning_event_on_bound_logger("{0} - I didn't find this script executed before. {1}{2}Stack Trace:{2}{3}", 
+                    script_name, 
+                    ex.Message,
+                    System.Environment.NewLine,
+                    ex.StackTrace);
             }
 
             if (string.IsNullOrEmpty(old_text_hash)) return true;
