@@ -106,22 +106,24 @@ namespace roundhouse.nunittests
     public class DatabaseMigratorTests
     {
         [Test]
-        public void CreateOrRestoreDatabase_WithoutDryRun_CreatesTheDatabase()
+        public void CreateOrRestoreDatabase_WithoutDryRun_Logs()
         {
             var sut = this.MakeTestableSut(false);
 
             var created = sut.create_or_restore_database("some script");
             StringAssert.Contains("Creating DbName database on ServerName server with custom script.", sut.checkInfoLog.ToString());
             Assert.AreEqual(true, created);
+            A.CallTo(() => sut.database.create_database_if_it_doesnt_exist("some script")).MustHaveHappened();
 
             sut.ClearCheckLog();
             created = sut.create_or_restore_database(null);
             StringAssert.Contains("Creating DbName database on ServerName server if it doesn't exist.", sut.checkInfoLog.ToString());
+            A.CallTo(() => sut.database.create_database_if_it_doesnt_exist(null)).MustHaveHappened();
             Assert.AreEqual(false, created);
         }
 
         [Test]
-        public void CreateOrRestoreDatabase_WithDryRun_DoesNotCreateTheDatabase()
+        public void CreateOrRestoreDatabase_WithDryRun_Logs()
         {
             var sut = this.MakeTestableSut(true);
 
@@ -246,7 +248,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(false);
             sut.version_the_database("SomePath", "SomeVersion");
-            StringAssert.Contains("Versioning DbName database with version SomeVersion based on SomePath", sut.checkInfoLog.ToString());
+            StringAssert.Contains("Versioning DbName database with version SomeVersion based on path \"SomePath\"", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.insert_version_and_get_version_id("SomePath", "SomeVersion")).MustHaveHappened();
         }
 
@@ -255,7 +257,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.version_the_database("SomePath", "SomeVersion");
-            StringAssert.Contains("-DryRun-Would version DbName database with version SomeVersion based on SomePath", sut.checkInfoLog.ToString());
+            StringAssert.Contains("-DryRun-Would version DbName database with version SomeVersion based on path \"SomePath\"", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.insert_version_and_get_version_id(A.Dummy<String>(), A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();
         }
 
@@ -324,7 +326,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.RunAllTheSqlStatements("SomeSQL", "SomeName", true, 1, "SomeVersion", "SomePath", ConnectionType.Default);
-            StringAssert.Contains(" -DryRun-Would have run SomeName on ServerName - DbName.", sut.checkInfoLog.ToString());
+            StringAssert.Contains("  * Would have run SomeName on ServerName - DbName.", sut.checkInfoLog.ToString());
             StringAssert.Contains("-DryRun-Would record SomeName script ran on ServerName - DbName", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.run_sql("SomeSQL", ConnectionType.Default)).WithAnyArguments().MustNotHaveHappened();
         }

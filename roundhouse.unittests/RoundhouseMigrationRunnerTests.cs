@@ -5,6 +5,9 @@ using roundhouse.databases.sqlserver2000;
 namespace roundhouse.unittests
 {
     using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using System.Collections.ObjectModel;
 
     using FakeItEasy;
     using NUnit.Framework;
@@ -35,6 +38,7 @@ namespace roundhouse.unittests
         public bool CheckChangeDropFolderCreated = false;
         public StringBuilder CheckLogWritten     = new StringBuilder();
         public StringBuilder CheckWarningWritten = new StringBuilder();
+        public StringBuilder CheckFilesCopied    = new StringBuilder();
 
         public TestableRoundhouseMigrationRunner()
             : base(A.Dummy<String>(),
@@ -85,11 +89,52 @@ namespace roundhouse.unittests
             CheckWarningWritten.AppendFormat(message, args);
         }
 
+        protected override bool does_directory_exist(string directory)
+        {
+            return true;
+        }
+
+        protected override string[] get_the_names_of_all_files_in_directory_nonrecursively(string directory)
+        {
+            return new string[] {"file1.sql", "file2.sql", "file3.sql"};
+        }
+
+        public override string get_file_text(string file_location)
+        {
+            return "SELECT * FROM TABLE;";
+        }
+
+        protected override string[] get_the_names_of_files_in_directory_recursively(string directory)
+        {
+            return new string[] {"file1.sql", "file2.sql", "file3.sql", "file4.sql", "file5.sql"};
+        }
+
+        protected override string[] get_the_names_of_directories_in_directory(string directory)
+        {
+            // to avoid infinite recursion
+            if (directory == RoundhouseMigrationRunnerTests.FOLDER_PATH)
+            {
+                return new string[] {"directory1", "directory2"};
+            }
+            else
+            {
+                return new string[] {};
+            }
+        }
+
+        protected override void file_copy_unsafe(string sql_file_ran, string destination_file)
+        {
+            CheckFilesCopied.AppendFormat("{0} -> {1}{2}", sql_file_ran, destination_file, System.Environment.NewLine);
+        }
     }
 
     [TestFixture]
     public class RoundhouseMigrationRunnerTests
     {
+        public const string REPO_PATH         = "repo_path";
+        public const string FOLDER_PATH       = "folderpath";
+        public readonly string NEW_DB_VERSION = "2";
+
         [Test]
         public void Run_WithNormalConfiguration_LogsThatWeAreAboutToKick()
         {
@@ -122,8 +167,22 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.dropping_the_database = true;
             sut.run();
+            A.CallTo(() => sut.database_migrator.open_admin_connection()).MustHaveHappened();
             A.CallTo(() => sut.database_migrator.delete_database()).WithAnyArguments().MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.close_admin_connection()).MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.close_connection()).MustHaveHappened();
             StringAssert.Contains("has removed database", sut.CheckLogWritten.ToString());
+        }
+
+        [Test]
+        public void Run_WithDryRun_WillNotDropDatabaseButWillCallMethodAndLog()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            sut.dropping_the_database = true;
+            sut.run();
+            StringAssert.Contains("would have removed database (DbName)", sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.database_migrator.delete_database()).WithAnyArguments().MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.close_connection()).MustHaveHappened();
         }
 
         [Test]
@@ -132,7 +191,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.dont_create_the_database = false;
             sut.run();
-            StringAssert.Contains("Would have created the database", sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.database_migrator.create_or_restore_database(A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
         }
 
         [Test]
@@ -142,18 +201,33 @@ namespace roundhouse.unittests
             sut.dont_create_the_database = false;
             sut.run();
             StringAssert.Contains("Creating the database using", sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.database_migrator.create_or_restore_database(A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
         }
 
         [Test]
-        [TestCase(RecoveryMode.Full, "Would have set the database recovery mode to Full on database DbName")]
-        [TestCase(RecoveryMode.Simple, "Would have set the database recovery mode to Simple on database DbName")]
-        public void Run_WithDryRun_WillNotSetRecoveryMode(RecoveryMode recoveryMode, string expected)
+        [TestCase(RecoveryMode.Full)]
+        [TestCase(RecoveryMode.Simple)]
+        public void Run_WithoutDryRun_WillSetRecoveryMode(RecoveryMode recoveryMode)
+        {
+
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            sut.fakeConfiguration.RecoveryMode = recoveryMode;
+            sut.run();
+            A.CallTo(() => sut.database_migrator.open_connection(true)).WithAnyArguments().MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.set_recovery_mode(recoveryMode == RecoveryMode.Simple)).MustHaveHappened();
+        }
+
+        [Test]
+        [TestCase(RecoveryMode.Full)]
+        [TestCase(RecoveryMode.Simple)]
+        public void Run_WithDryRun_WillCallRecoveryMode(RecoveryMode recoveryMode, string expected)
         {
 
             var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.fakeConfiguration.RecoveryMode = recoveryMode;
             sut.run();
             StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.database_migrator.set_recovery_mode(recoveryMode == RecoveryMode.Simple)).MustHaveHappened();
         }
 
         [Test]
@@ -216,11 +290,12 @@ namespace roundhouse.unittests
         }
 
         [Test]
-        public void Run_WithDryRun_DoesntRunSupportTasks()
+        public void Run_WithDryRun_DoesRunRoundhouseSupportTasks()
         {
             var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
             StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
         }
 
         [Test]
@@ -233,11 +308,13 @@ namespace roundhouse.unittests
         }
 
         [Test]
-        public void Run_WithDryRun_DoesNotInsertNewVersionRowIntoTheDatabase()
+        public void Run_WithDryRun_DoesCallVersionTheDatabaseBecauseItIsDryRunSafe()
         {
             var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
             StringAssert.Contains("Would have migrated database DbName from version 1 to 2", sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.database_migrator.get_current_version(REPO_PATH)).MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.version_the_database(REPO_PATH, NEW_DB_VERSION)).MustHaveHappened();
         }
 
         [Test]
@@ -246,24 +323,32 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
             StringAssert.Contains("Migrating DbName from version 1 to 2", sut.CheckLogWritten.ToString());
+            A.CallTo(() => sut.database_migrator.get_current_version(REPO_PATH)).MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.version_the_database(REPO_PATH, NEW_DB_VERSION)).MustHaveHappened();
         }
 
         [Test]
-        public void Run_WithDryRun_DoesNotLogAndTraverseFolders()
+        public void Run_WithDryRun_DoesLogAndTraverseFoldersBecauseRunSqlIsDryRunSafe()
         {
             var sut = MakeTestableRoundhouseMigrationRunner(true);
+            A.CallTo(() => sut.database_migrator.run_sql("", "", true, true, 0, A.Dummy<Environment>(), "", "", A.Dummy<ConnectionType>())).WithAnyArguments().Returns(true);
             sut.run();
-            StringAssert.Contains("Would have been looking for friendly-alter scripts in \"folderpath\\alter\". These scripts would be run every time", sut.CheckLogWritten.ToString());
-            StringAssert.Contains("Would have been looking for friendly-functions scripts in \"folderpath\\functions\". These would be one time only scripts", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Looking for friendly-alter scripts in \"" + FOLDER_PATH + "\\alter\" (every time scripts)", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Looking for friendly-functions scripts in \"" + FOLDER_PATH + "\\functions\" (one-time only scripts)", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("file1.sql ->", sut.CheckFilesCopied.ToString());
+            A.CallTo(() => sut.database_migrator.run_sql("", "", true, true, 0, A.Dummy<Environment>(), "", "", A.Dummy<ConnectionType>())).WithAnyArguments().MustHaveHappened();
         }
 
         [Test]
         public void Run_WithoutDryRun_DoesLogAndTraverseFolders()
         {
             var sut = MakeTestableRoundhouseMigrationRunner(false);
+            A.CallTo(() => sut.database_migrator.run_sql("", "", true, true, 0, A.Dummy<Environment>(), "", "", A.Dummy<ConnectionType>())).WithAnyArguments().Returns(true);
             sut.run();
-            StringAssert.Contains("Looking for friendly-alter scripts in \"folderpath\\alter\". These scripts will run every time", sut.CheckLogWritten.ToString());
-            StringAssert.Contains("Looking for friendly-functions scripts in \"folderpath\\functions\". These should be one time only scripts", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Looking for friendly-alter scripts in \"" + FOLDER_PATH + "\\alter\" (every time scripts)", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("Looking for friendly-functions scripts in \"" + FOLDER_PATH + "\\functions\" (one-time only scripts)", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("file1.sql ->", sut.CheckFilesCopied.ToString());
+            A.CallTo(() => sut.database_migrator.run_sql("", "", true, true, 0, A.Dummy<Environment>(), "", "", A.Dummy<ConnectionType>())).WithAnyArguments().MustHaveHappened();
         }
 
         [Test]
@@ -271,7 +356,8 @@ namespace roundhouse.unittests
         {
             var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
-            StringAssert.IsMatch("RoundhousE v([0-9.]*) has kicked your database \\(DbName\\)\\! You are now at version 2\\. All changes and backups can be found at \"folderpath\\\\change_drop\"", sut.CheckLogWritten.ToString());
+            StringAssert.IsMatch("RoundhousE v([0-9.]*) has kicked your database \\(DbName\\)\\! You are now at version " + NEW_DB_VERSION + 
+                "\\. All changes and backups can be found at \"" + FOLDER_PATH + "\\\\change_drop\"", sut.CheckLogWritten.ToString());
         }
 
         [Test]
@@ -279,7 +365,8 @@ namespace roundhouse.unittests
         {
             var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
-            StringAssert.IsMatch("-DryRun-RoundhousE v([0-9.]*) would have kicked your database \\(DbName\\)\\! You would be at version 2\\. All changes and backups can be found at \"folderpath\\\\change_drop\"", sut.CheckLogWritten.ToString());
+            StringAssert.IsMatch("-DryRun-RoundhousE v([0-9.]*) would have kicked your database \\(DbName\\)\\! You would be at version " + NEW_DB_VERSION
+                + "\\. All changes and backups can be found at \"" + FOLDER_PATH + "\\\\change_drop\"", sut.CheckLogWritten.ToString());
         }
 
         [Test]
@@ -288,7 +375,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.dropping_the_database = true;
             sut.run();
-            StringAssert.Contains("RoundhousE has removed database (DbName). All changes and backups can be found at \"folderpath\\change_drop\"", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("RoundhousE has removed database (DbName). All changes and backups can be found at \"" + FOLDER_PATH + "\\change_drop\"", sut.CheckLogWritten.ToString());
         }
 
         [Test]
@@ -297,7 +384,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.dropping_the_database = true;
             sut.run();
-            StringAssert.Contains("-DryRun-RoundhousE would have removed database (DbName). All changes and backups would be found at \"folderpath\\change_drop\"", sut.CheckLogWritten.ToString());
+            StringAssert.Contains("-DryRun-RoundhousE would have removed database (DbName). All changes and backups would be found at \"" + FOLDER_PATH + "\\change_drop\"", sut.CheckLogWritten.ToString());
         }
 
         private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun)
@@ -310,14 +397,14 @@ namespace roundhouse.unittests
                 .Returns(MakeMigrationsFolder("change_drop", true, false));
             A.CallTo(() => sut.fakeKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
             A.CallTo(() => sut.fakeKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
-            A.CallTo(() => sut.fakeVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => sut.fakeVersionResolver.resolve_version()).Returns(NEW_DB_VERSION);
             A.CallTo(() => sut.fakeDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
             return sut;
         }
 
         private MigrationsFolder MakeMigrationsFolder(string folderName, bool oneTime, bool everyTime)
         {
-            return new DefaultMigrationsFolder(A.Dummy<WindowsFileSystemAccess>(), "folderpath", folderName, oneTime, everyTime, "friendly-" + folderName);
+            return new DefaultMigrationsFolder(A.Dummy<WindowsFileSystemAccess>(), FOLDER_PATH, folderName, oneTime, everyTime, "friendly-" + folderName);
         }
     }
 }

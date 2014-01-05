@@ -30,6 +30,8 @@ namespace roundhouse.runners
         protected ConfigurationPropertyHolder configuration;
         protected const string SQL_EXTENSION = "*.sql";
 
+        private const int LINE_WIDTH = 72;
+
         public RoundhouseMigrationRunner(
             string repository_path,
             Environment environment,
@@ -77,6 +79,8 @@ namespace roundhouse.runners
                 this.log_action_starting();
 
                 create_share_and_set_permissions_for_change_drop_folder();
+
+                // TODO (PMO): This was commented out, figure out if we can turn it on again?
                 //database_migrator.backup_database_if_it_exists();
                 remove_share_from_change_drop_folder();
 
@@ -168,25 +172,12 @@ namespace roundhouse.runners
                     System.Environment.NewLine,
                     database_migrator.database.database_name);
             }
-            else if (!configuration.DryRun)
-            {
-                database_migrator.open_connection(run_in_a_transaction);
-            }
+            database_migrator.open_connection(run_in_a_transaction);
         }
 
         protected virtual void set_database_recovery_mode()
         {
-            if (configuration.DryRun)
-            {
-                if (configuration.RecoveryMode != RecoveryMode.NoChange)
-                {
-                    log_info_event_on_bound_logger("{0}{0}-DryRun- Would have set the database recovery mode to {1} on database {2}", 
-                        System.Environment.NewLine,
-                        configuration.RecoveryMode == RecoveryMode.Simple ? "Simple" : "Full",
-                        database_migrator.database.database_name);
-                }
-            } 
-            else if (configuration.RecoveryMode != RecoveryMode.NoChange)
+            if (configuration.RecoveryMode != RecoveryMode.NoChange)
             {
                 database_migrator.set_recovery_mode(configuration.RecoveryMode == RecoveryMode.Simple);
             }
@@ -196,11 +187,7 @@ namespace roundhouse.runners
         {
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger("{0}{0}-DryRun- Would have created the database using this script: {1}",
-                    System.Environment.NewLine,
-                    this.get_custom_create_database_script()
-                    );
-                return false;
+                return database_migrator.create_or_restore_database(get_custom_create_database_script());
             }
             else
             {
@@ -208,7 +195,7 @@ namespace roundhouse.runners
                     System.Environment.NewLine,
                     this.get_custom_create_database_script()
                     );
-                return database_migrator.create_or_restore_database(this.get_custom_create_database_script());
+                return database_migrator.create_or_restore_database(get_custom_create_database_script());
             }
         }
 
@@ -234,9 +221,9 @@ namespace roundhouse.runners
 
         private void log_action_starting()
         {
-            this.log_separation_line();
+            this.log_separation_line(true);
             log_info_event_on_bound_logger("Setup, Backup, Create/Restore/Drop");
-            this.log_separation_line();
+            this.log_separation_line(true);
         }
 
         private void log_and_traverse_known_folders(long version_id, string new_version, bool database_was_created)
@@ -273,62 +260,61 @@ namespace roundhouse.runners
 
         private void log_migration_scripts()
         {
-            log_separation_line();
+            log_separation_line(true);
             log_info_event_on_bound_logger("Migration Scripts");
-            log_separation_line();
+            log_separation_line(true);
         }
 
         private long log_and_run_version_the_database(string new_version)
         {
-            this.log_separation_line();
+            log_separation_line(true);
             log_info_event_on_bound_logger("Versioning");
-            this.log_separation_line();
-            string current_version = this.database_migrator.get_current_version(this.repository_path);
-            long version_id = 0;
+            log_separation_line(true);
+            var current_version = database_migrator.get_current_version(repository_path);
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(
                         "-DryRun- Would have migrated database {0} from version {1} to {2}.",
-                        this.database_migrator.database.database_name,
+                        database_migrator.database.database_name,
                         current_version,
                         new_version);
-                version_id = 1;
             }
             else
             {
                 log_info_event_on_bound_logger(
                         " Migrating {0} from version {1} to {2}.",
-                        this.database_migrator.database.database_name,
+                        database_migrator.database.database_name,
                         current_version,
                         new_version);
-                version_id = this.database_migrator.version_the_database(this.repository_path, new_version);
             }
-            return version_id;
+            return database_migrator.version_the_database(repository_path, new_version);
         }
 
         private void log_and_run_support_tasks()
         {
-            this.log_separation_line();
+            this.log_separation_line(true);
             log_info_event_on_bound_logger("RoundhousE Structure");
-            this.log_separation_line();
+            this.log_separation_line(true);
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger("{0}{0}-DryRun- Would have run roundhouse support tasks on database {1}",
                     System.Environment.NewLine,
                     database_migrator.database.database_name
                     );
+            }
+            database_migrator.run_roundhouse_support_tasks();
+        }
 
-
+        private void log_separation_line(bool isThick)
+        {
+            if (isThick)
+            {
+                log_info_event_on_bound_logger("{0}", "=".PadRight(LINE_WIDTH, '='));
             }
             else
             {
-                database_migrator.run_roundhouse_support_tasks();
+                log_info_event_on_bound_logger("{0}", "-".PadRight(LINE_WIDTH, '-'));
             }
-        }
-
-        private void log_separation_line()
-        {
-            log_info_event_on_bound_logger("{0}", "=".PadRight(50, '='));
         }
 
         private void create_change_drop_folder_and_log()
@@ -388,21 +374,23 @@ namespace roundhouse.runners
                     "{0}{0}-DryRun-{1} would have removed database ({2}). All changes and backups would be found at \"{3}\".",
                     System.Environment.NewLine,
                     ApplicationParameters.name,
-                    this.database_migrator.database.database_name,
-                    this.known_folders.change_drop.folder_full_path);
+                    database_migrator.database.database_name,
+                    known_folders.change_drop.folder_full_path);
+                database_migrator.delete_database();
+                database_migrator.close_connection();
             }
             else
             {
-                this.database_migrator.open_admin_connection();
-                this.database_migrator.delete_database();
-                this.database_migrator.close_admin_connection();
-                this.database_migrator.close_connection();
+                database_migrator.open_admin_connection();
+                database_migrator.delete_database();
+                database_migrator.close_admin_connection();
+                database_migrator.close_connection();
                 log_info_event_on_bound_logger(
                     "{0}{0}{1} has removed database ({2}). All changes and backups can be found at \"{3}\".",
                     System.Environment.NewLine,
                     ApplicationParameters.name,
-                    this.database_migrator.database.database_name,
-                    this.known_folders.change_drop.folder_full_path);
+                    database_migrator.database.database_name,
+                    known_folders.change_drop.folder_full_path);
             }
         }
 
@@ -423,30 +411,26 @@ namespace roundhouse.runners
 
         public void log_and_traverse(MigrationsFolder folder, long version_id, string new_version, ConnectionType connection_type)
         {
-            log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
+            log_separation_line(false);
 
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger("-DryRun- Would have been looking for {0} scripts in \"{1}\".{2}{3}",
+                log_info_event_on_bound_logger("-DryRun-Looking for {0} scripts in \"{1}\"{2}{3}",
                                                                 folder.friendly_name,
                                                                 folder.folder_full_path,
-                                                                folder.should_run_items_in_folder_once ? " These would be one time only scripts." : string.Empty,
-                                                                folder.should_run_items_in_folder_every_time ? " These scripts would be run every time" : string.Empty);
-
-                log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
-                //traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
+                                                                folder.should_run_items_in_folder_once ? " (one-time only scripts)." : string.Empty,
+                                                                folder.should_run_items_in_folder_every_time ? " (every time scripts)" : string.Empty);
             }
             else
             {
-                log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\".{2}{3}",
+                log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\"{2}{3}",
                                                                 folder.friendly_name,
                                                                 folder.folder_full_path,
-                                                                folder.should_run_items_in_folder_once ? " These should be one time only scripts." : string.Empty,
-                                                                folder.should_run_items_in_folder_every_time ? " These scripts will run every time" : string.Empty);
+                                                                folder.should_run_items_in_folder_once ? " (one-time only scripts)." : string.Empty,
+                                                                folder.should_run_items_in_folder_every_time ? " (every time scripts)" : string.Empty);
 
-                log_info_event_on_bound_logger("{0}", "-".PadRight(50, '-'));
-                traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
             }
+            traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
         }
 
         public void run_out_side_of_transaction_folder(MigrationsFolder folder, long version_id, string new_version)
@@ -508,44 +492,96 @@ namespace roundhouse.runners
 
         //todo:down story
 
-        public void traverse_files_and_run_sql(string directory, long version_id, MigrationsFolder migration_folder, Environment migrating_environment,
-                                               string repository_version, ConnectionType connection_type)
+        public void traverse_files_and_run_sql(string directory, long version_id, 
+            MigrationsFolder migration_folder, Environment migrating_environment,
+            string repository_version, ConnectionType connection_type)
         {
-            if (!file_system.directory_exists(directory)) return;
+            if (!does_directory_exist(directory)) return;
 
             var fileNames = configuration.SearchAllSubdirectoriesInsteadOfTraverse
-                                ? file_system.get_all_file_name_strings_recurevly_in(directory, SQL_EXTENSION)
-                                : file_system.get_all_file_name_strings_in(directory, SQL_EXTENSION);
+                                ? get_the_names_of_files_in_directory_recursively(directory)
+                                : get_the_names_of_all_files_in_directory_nonrecursively(directory);
             foreach (string sql_file in fileNames)
             {
-                string sql_file_text = replace_tokens(get_file_text(sql_file));
-                log_debug_event_on_bound_logger(" Found and running {0}.", sql_file);
-                bool the_sql_ran = database_migrator.run_sql(sql_file_text, file_system.get_file_name_from(sql_file),
-                                                             migration_folder.should_run_items_in_folder_once,
-                                                             migration_folder.should_run_items_in_folder_every_time,
-                                                             version_id, migrating_environment, repository_version, repository_path, connection_type);
-                if (the_sql_ran)
-                {
-                    try
-                    {
-                        copy_to_change_drop_folder(sql_file, migration_folder);
-                    }
-                    catch (Exception ex)
-                    {
-                        log_warning_event_on_bound_logger("Unable to copy {0} to {1}. {2}{3}", sql_file, migration_folder.folder_full_path,
-                                                                          System.Environment.NewLine, ex.to_string());
-                    }
-                }
+                run_sql_and_copy_to_change_drop(version_id, migration_folder, migrating_environment, 
+                    repository_version, connection_type, sql_file);
             }
 
-            if (configuration.SearchAllSubdirectoriesInsteadOfTraverse) return;
-            foreach (string child_directory in file_system.get_all_directory_name_strings_in(directory))
+            if (configuration.SearchAllSubdirectoriesInsteadOfTraverse)
+            {
+                return;
+            }
+
+            foreach (var child_directory in get_the_names_of_directories_in_directory(directory))
             {
                 traverse_files_and_run_sql(child_directory, version_id, migration_folder, migrating_environment, repository_version, connection_type);
             }
         }
 
-        public string get_file_text(string file_location)
+        protected virtual string[] get_the_names_of_directories_in_directory(string directory)
+        {
+            return file_system.get_all_directory_name_strings_in(directory);
+        }
+
+        protected virtual string[] get_the_names_of_all_files_in_directory_nonrecursively(string directory)
+        {
+            return file_system.get_all_file_name_strings_in(directory, SQL_EXTENSION);
+        }
+
+        protected virtual string[] get_the_names_of_files_in_directory_recursively(string directory)
+        {
+            return file_system.get_all_file_name_strings_recurevly_in(directory, SQL_EXTENSION);
+        }
+
+        protected virtual bool does_directory_exist(string directory)
+        {
+            return file_system.directory_exists(directory);
+        }
+
+        private void run_sql_and_copy_to_change_drop(
+            long version_id,
+            MigrationsFolder migration_folder,
+            Environment migrating_environment,
+            string repository_version,
+            ConnectionType connection_type,
+            string sql_file)
+        {
+            string sql_file_text = replace_tokens(get_file_text(sql_file));
+            log_debug_event_on_bound_logger(" Found and running {0}.", sql_file);
+            bool the_sql_ran = database_migrator.run_sql(
+                sql_file_text,
+                file_system.get_file_name_from(sql_file),
+                migration_folder.should_run_items_in_folder_once,
+                migration_folder.should_run_items_in_folder_every_time,
+                version_id,
+                migrating_environment,
+                repository_version,
+                repository_path,
+                connection_type);
+            if (the_sql_ran)
+            {
+                copy_to_change_drop_and_log_exception(migration_folder, sql_file);
+            }
+        }
+
+        private void copy_to_change_drop_and_log_exception(MigrationsFolder migration_folder, string sql_file)
+        {
+            try
+            {
+                copy_to_change_drop_folder(sql_file, migration_folder);
+            }
+            catch (Exception ex)
+            {
+                log_warning_event_on_bound_logger(
+                    "Unable to copy {0} to {1}. {2}{3}",
+                    sql_file,
+                    migration_folder.folder_full_path,
+                    System.Environment.NewLine,
+                    ex.to_string());
+            }
+        }
+
+        public virtual string get_file_text(string file_location)
         {
             return file_system.read_file_text(file_location);
         }
@@ -568,8 +604,13 @@ namespace roundhouse.runners
                                                                     sql_file_ran.Replace(migration_folder.folder_path + "\\", string.Empty));
                 file_system.verify_or_create_directory(file_system.get_directory_name_from(destination_file));
                 log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(sql_file_ran), destination_file);
-                file_system.file_copy_unsafe(sql_file_ran, destination_file, true);
+                file_copy_unsafe(sql_file_ran, destination_file);
             }
+        }
+
+        protected virtual void file_copy_unsafe(string sql_file_ran, string destination_file)
+        {
+            file_system.file_copy_unsafe(sql_file_ran, destination_file, true);
         }
     }
 }
