@@ -17,18 +17,18 @@ namespace roundhouse.runners
 
     public class RoundhouseMigrationRunner : IRunner
     {
-        private readonly string repository_path;
-        private readonly Environment environment;
-        private readonly KnownFolders known_folders;
-        private readonly FileSystemAccess file_system;
-        public DatabaseMigrator database_migrator { get; private set; }
-        private readonly VersionResolver version_resolver;
+        protected string repository_path;
+        protected Environment environment;
+        protected KnownFolders known_folders;
+        protected FileSystemAccess file_system;
+        public DatabaseMigrator database_migrator { get; protected set; }
+        protected VersionResolver version_resolver;
         public bool silent { get; set; }
         public bool dropping_the_database { get; set; }
         public bool dont_create_the_database;
         public bool run_in_a_transaction;
-        private readonly ConfigurationPropertyHolder configuration;
-        private const string SQL_EXTENSION = "*.sql";
+        protected ConfigurationPropertyHolder configuration;
+        protected const string SQL_EXTENSION = "*.sql";
 
         public RoundhouseMigrationRunner(
             string repository_path,

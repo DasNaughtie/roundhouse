@@ -28,15 +28,15 @@ namespace roundhouse.nunittests
 
         public TestableDefaultDatabaseMigrator() : base(A.Dummy<Database>(), A.Dummy<CryptographicService>(), A.Dummy<ConfigurationPropertyHolder>())
         {
-            database                         = mockDatabase;
-            crypto_provider                  = mockCryptoService;
-            configuration                    = configurationPropHolder;
-            restoring_database               = configuration.Restore;
-            restore_path                     = configuration.RestoreFromPath;
-            custom_restore_options           = configuration.RestoreCustomOptions;
-            output_path                      = configuration.OutputPath;
+            database                               = mockDatabase;
+            crypto_provider                        = mockCryptoService;
+            configuration                          = configurationPropHolder;
+            restoring_database                     = configuration.Restore;
+            restore_path                           = configuration.RestoreFromPath;
+            custom_restore_options                 = configuration.RestoreCustomOptions;
+            output_path                            = configuration.OutputPath;
             throw_error_on_one_time_script_changes = !configuration.WarnOnOneTimeScriptChanges;
-            is_running_all_any_time_scripts  = configuration.RunAllAnyTimeScripts;
+            is_running_all_any_time_scripts        = configuration.RunAllAnyTimeScripts;
         }
 
         public void SetRestoringDatabase(bool value)

@@ -346,7 +346,7 @@ namespace roundhouse.migrators
                         sql_statement);
                 database.rollback();
 
-                record_script_in_scripts_run_errors_table(
+                record_script_in_scripts_run_errors_table_is_dry_run_safe(
                     script_name,
                     sql_to_run,
                     sql_statement,
@@ -389,7 +389,7 @@ namespace roundhouse.migrators
                 string.Format(
                     "{0} has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set warnOnOneTimeScriptChanges to true and run again. Stopping execution.",
                     script_name);
-            record_script_in_scripts_run_errors_table(
+            record_script_in_scripts_run_errors_table_is_dry_run_safe(
                 script_name,
                 sql_to_run,
                 sql_to_run,
@@ -432,7 +432,7 @@ namespace roundhouse.migrators
             }
         }
 
-        public void record_script_in_scripts_run_errors_table(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
+        public void record_script_in_scripts_run_errors_table_is_dry_run_safe(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
         {
             if (configuration.DryRun)
             {
