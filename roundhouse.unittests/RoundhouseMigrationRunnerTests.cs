@@ -4,11 +4,14 @@ using roundhouse.databases.sqlserver2000;
 
 namespace roundhouse.unittests
 {
+    using System;
+
     using FakeItEasy;
     using NUnit.Framework;
     using roundhouse.consoles;
     using roundhouse.environments;
     using roundhouse.folders;
+    using roundhouse.infrastructure.app;
     using roundhouse.infrastructure.filesystem;
     using roundhouse.infrastructure.logging;
     using roundhouse.migrators;
@@ -16,15 +19,17 @@ namespace roundhouse.unittests
     using roundhouse.runners;
     using System.Text;
 
+    using Environment = roundhouse.environments.Environment;
+
     public class TestableRoundhouseMigrationRunner : RoundhouseMigrationRunner
     {
         public Logger mockLogger                                   = A.Fake<Logger>();
-        public static DatabaseMigrator mockDbMigrator              = A.Fake<DatabaseMigrator>();
-        public static DefaultConfiguration mockConfiguration       = A.Fake<DefaultConfiguration>();
-        public static DefaultEnvironment mockEnvironment           = A.Fake<DefaultEnvironment>();
-        public static KnownFolders mockKnownFolders                = A.Fake<KnownFolders>();
-        public static WindowsFileSystemAccess mockFileSystemAccess = A.Fake<WindowsFileSystemAccess>();
-        public static VersionResolver mockVersionResolver          = A.Fake<VersionResolver>();
+        public DatabaseMigrator fakeDbMigrator                     = A.Fake<DatabaseMigrator>();
+        public DefaultConfiguration fakeConfiguration              = A.Fake<DefaultConfiguration>();
+        public DefaultEnvironment fakeEnvironment                  = A.Fake<DefaultEnvironment>();
+        public KnownFolders fakeKnownFolders                       = A.Fake<KnownFolders>();
+        public WindowsFileSystemAccess fakeFileSystemAccess        = A.Fake<WindowsFileSystemAccess>();
+        public VersionResolver fakeVersionResolver                 = A.Fake<VersionResolver>();
 
         // Quick stub checks
         public bool CheckChangeDropFolderCreated = false;
@@ -32,19 +37,27 @@ namespace roundhouse.unittests
         public StringBuilder CheckWarningWritten = new StringBuilder();
 
         public TestableRoundhouseMigrationRunner()
-            : base("repo_path",
-                mockEnvironment,
-                mockKnownFolders,
-                mockFileSystemAccess,
-                mockDbMigrator, 
-                mockVersionResolver,
+            : base(A.Dummy<String>(),
+                A.Dummy<Environment>(),
+                A.Dummy<KnownFolders>(),
+                A.Dummy<FileSystemAccess>(),
+                A.Dummy<DatabaseMigrator>(), 
+                A.Dummy<VersionResolver>(),
                 false,
                 false,
                 false,
                 false,
                 true,
-                mockConfiguration)
+                A.Dummy<ConfigurationPropertyHolder>())
         {
+            repository_path   = "repo_path";
+            environment       = fakeEnvironment;
+            known_folders     = fakeKnownFolders;
+            file_system       = fakeFileSystemAccess;
+            database_migrator = fakeDbMigrator;
+            version_resolver  = fakeVersionResolver;
+            configuration     = fakeConfiguration;
+
         }
 
         protected override Logger get_bound_logger()
@@ -80,8 +93,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithNormalConfiguration_LogsThatWeAreAboutToKick()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
             StringAssert.Contains("Please press enter when ready to kick", sut.CheckLogWritten.ToString());
             Assert.AreEqual(true, sut.CheckChangeDropFolderCreated);
@@ -92,8 +104,7 @@ namespace roundhouse.unittests
         [TestCase(false, "This is a dry run", false)]
         public void Run_WithOrWithoutDryRun_LogsAppropriateInfoActions(bool isDryRun, string testString, bool shouldContain)
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = isDryRun;
+            var sut = MakeTestableRoundhouseMigrationRunner(isDryRun);
             sut.run();
             if (shouldContain)
             {
@@ -108,8 +119,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_WillDropDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.dropping_the_database = true;
             sut.run();
             A.CallTo(() => sut.database_migrator.delete_database()).WithAnyArguments().MustHaveHappened();
@@ -119,8 +129,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_WillNotCreateTheDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.dont_create_the_database = false;
             sut.run();
             StringAssert.Contains("Would have created the database", sut.CheckLogWritten.ToString());
@@ -129,8 +138,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_WillCreateTheDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.dont_create_the_database = false;
             sut.run();
             StringAssert.Contains("Creating the database using", sut.CheckLogWritten.ToString());
@@ -141,10 +149,9 @@ namespace roundhouse.unittests
         [TestCase(RecoveryMode.Simple, "Would have set the database recovery mode to Simple on database DbName")]
         public void Run_WithDryRun_WillNotSetRecoveryMode(RecoveryMode recoveryMode, string expected)
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            TestableRoundhouseMigrationRunner.mockConfiguration.RecoveryMode = recoveryMode;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            sut.fakeConfiguration.RecoveryMode = recoveryMode;
             sut.run();
             StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
         }
@@ -160,8 +167,9 @@ namespace roundhouse.unittests
             string expected, 
             string notExpected)
         {
+            // TODO (PMO): Clean this up so it doesn't rely on stringAsserts, but rather A.CallTo(...
             var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
+            sut.fakeConfiguration.DryRun = true;
             sut.run_in_a_transaction = runInTransaction;
             if (supportsTransaction)
             {
@@ -171,7 +179,7 @@ namespace roundhouse.unittests
             {
                 sut.database_migrator.database = new AccessDatabase();
             }
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            sut.fakeDbMigrator.database.database_name = "DbName";
             sut.run();
             if (string.IsNullOrEmpty(expected) == false)
             {
@@ -184,18 +192,16 @@ namespace roundhouse.unittests
         }
 
         [Test]
-        [TestCase(true, true, null, "Would have began a transaction on database DbName")]
-        [TestCase(true, false, null, "Would have began a transaction on database DbName")]
-        [TestCase(false, true, null, "Would have began a transaction on database DbName")]
-        [TestCase(false, false, null, "Would have began a transaction on database DbName")]
+        [TestCase(true, true, "Would have began a transaction on database DbName")]
+        [TestCase(true, false, "Would have began a transaction on database DbName")]
+        [TestCase(false, true, "Would have began a transaction on database DbName")]
+        [TestCase(false, false, "Would have began a transaction on database DbName")]
         public void Run_WithoutDryRunAndTransactionRequestedAndDbThatSupportsTransactions_WillBeginTransaction(
             bool runInTransaction,
             bool supportsTransaction,
-            string expected,
             string notExpected)
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run_in_a_transaction = runInTransaction;
             if (supportsTransaction)
             {
@@ -205,24 +211,14 @@ namespace roundhouse.unittests
             {
                 sut.database_migrator.database = new AccessDatabase();
             }
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
             sut.run();
-            if (string.IsNullOrEmpty(expected) == false)
-            {
-                StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
-            }
-            else
-            {
-                StringAssert.DoesNotContain(notExpected, sut.CheckLogWritten.ToString());
-            }
+            StringAssert.DoesNotContain(notExpected, sut.CheckLogWritten.ToString());
         }
 
         [Test]
         public void Run_WithDryRun_DoesntRunSupportTasks()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
             StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
         }
@@ -230,23 +226,16 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_RunsSupportTasks()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
             StringAssert.DoesNotContain("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
-            // This line doesn't prove much becauset he mock is static and has history from the other tests.
-            // A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
+            A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
         }
 
         [Test]
         public void Run_WithDryRun_DoesNotInsertNewVersionRowIntoTheDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
             StringAssert.Contains("Would have migrated database DbName from version 1 to 2", sut.CheckLogWritten.ToString());
         }
@@ -254,11 +243,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_DoesInsertNewVersionRowIntoTheDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
             StringAssert.Contains("Migrating DbName from version 1 to 2", sut.CheckLogWritten.ToString());
         }
@@ -266,10 +251,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_DoesNotLogAndTraverseFolders()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
             StringAssert.Contains("Would have been looking for friendly-alter scripts in \"folderpath\\alter\". These scripts would be run every time", sut.CheckLogWritten.ToString());
             StringAssert.Contains("Would have been looking for friendly-functions scripts in \"folderpath\\functions\". These would be one time only scripts", sut.CheckLogWritten.ToString());
@@ -278,10 +260,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_DoesLogAndTraverseFolders()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
             StringAssert.Contains("Looking for friendly-alter scripts in \"folderpath\\alter\". These scripts will run every time", sut.CheckLogWritten.ToString());
             StringAssert.Contains("Looking for friendly-functions scripts in \"folderpath\\functions\". These should be one time only scripts", sut.CheckLogWritten.ToString());
@@ -290,13 +269,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_TellsYouYourDatabaseWasKicked()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
-                .Returns(MakeMigrationsFolder("change_drop", true, false));
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.run();
             StringAssert.IsMatch("RoundhousE v([0-9.]*) has kicked your database \\(DbName\\)\\! You are now at version 2\\. All changes and backups can be found at \"folderpath\\\\change_drop\"", sut.CheckLogWritten.ToString());
         }
@@ -304,13 +277,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_TellsYouYourDatabaseWouldHaveBeenKicked()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
-                .Returns(MakeMigrationsFolder("change_drop", true, false));
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.run();
             StringAssert.IsMatch("-DryRun-RoundhousE v([0-9.]*) would have kicked your database \\(DbName\\)\\! You would be at version 2\\. All changes and backups can be found at \"folderpath\\\\change_drop\"", sut.CheckLogWritten.ToString());
         }
@@ -318,14 +285,8 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRunAndDatabaseDropRequested_DropsTheDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = false;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.dropping_the_database = true;
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
-                .Returns(MakeMigrationsFolder("change_drop", true, false));
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
             sut.run();
             StringAssert.Contains("RoundhousE has removed database (DbName). All changes and backups can be found at \"folderpath\\change_drop\"", sut.CheckLogWritten.ToString());
         }
@@ -333,16 +294,25 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRunAndDatabaseDropRequested_DoesntDropTheDatabase()
         {
-            var sut = new TestableRoundhouseMigrationRunner();
-            TestableRoundhouseMigrationRunner.mockConfiguration.DryRun = true;
-            TestableRoundhouseMigrationRunner.mockDbMigrator.database.database_name = "DbName";
+            var sut = MakeTestableRoundhouseMigrationRunner(true);
             sut.dropping_the_database = true;
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockKnownFolders.change_drop)
-                .Returns(MakeMigrationsFolder("change_drop", true, false));
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockVersionResolver.resolve_version()).Returns("2");
-            A.CallTo(() => TestableRoundhouseMigrationRunner.mockDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
             sut.run();
             StringAssert.Contains("-DryRun-RoundhousE would have removed database (DbName). All changes and backups would be found at \"folderpath\\change_drop\"", sut.CheckLogWritten.ToString());
+        }
+
+        private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun)
+        {
+            var sut                                   = new TestableRoundhouseMigrationRunner();
+            sut.fakeConfiguration.DryRun              = dryRun;
+            sut.fakeDbMigrator.database.database_name = "DbName";
+            sut.dropping_the_database                 = false;
+            A.CallTo(() => sut.fakeKnownFolders.change_drop)
+                .Returns(MakeMigrationsFolder("change_drop", true, false));
+            A.CallTo(() => sut.fakeKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
+            A.CallTo(() => sut.fakeKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
+            A.CallTo(() => sut.fakeVersionResolver.resolve_version()).Returns("2");
+            A.CallTo(() => sut.fakeDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            return sut;
         }
 
         private MigrationsFolder MakeMigrationsFolder(string folderName, bool oneTime, bool everyTime)
