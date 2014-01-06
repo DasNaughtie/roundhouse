@@ -200,7 +200,6 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(false);
             sut.dont_create_the_database = false;
             sut.run();
-            StringAssert.Contains("Creating the database using", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.database_migrator.create_or_restore_database(A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
         }
 

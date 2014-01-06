@@ -95,7 +95,7 @@ namespace roundhouse.databases.sqlserver
 
         public override void run_database_specific_tasks()
         {
-            Log.bound_to(this).log_an_info_event_containing(" Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
+            Log.bound_to(this).log_an_info_event_containing(" -> Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
             create_roundhouse_schema_if_it_doesnt_exist();
 
             Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: This should remove a user named RoundhousE if one exists (migration from SQL2000 up)");

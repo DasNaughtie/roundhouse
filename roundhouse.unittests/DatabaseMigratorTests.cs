@@ -219,9 +219,9 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.run_roundhouse_support_tasks();
-            StringAssert.Contains(" -DryRun-Would create [VersionTable] table if it didn't exist.", sut.checkInfoLog.ToString());
-            StringAssert.Contains(" -DryRun-Would create [ScriptsRunTable] table if it didn't exist.", sut.checkInfoLog.ToString());
-            StringAssert.Contains(" -DryRun-Would create [ScriptsRunErrorsTable] table if it didn't exist.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would create [VersionTable] table if it didn't exist.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would create [ScriptsRunTable] table if it didn't exist.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would create [ScriptsRunErrorsTable] table if it didn't exist.", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.create_or_update_roundhouse_tables()).MustNotHaveHappened();
         }
 
@@ -230,7 +230,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(false);
             sut.delete_database();
-            StringAssert.Contains("Deleting DbName database on ServerName server if it exists.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Deleting DbName database on ServerName server if it exists.", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.delete_database_if_it_exists()).MustHaveHappened();
         }
 
@@ -239,7 +239,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.delete_database();
-            StringAssert.Contains("-DryRun-Would have deleted DbName database on ServerName server if it existed.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would have deleted DbName database on ServerName server if it existed.", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.delete_database_if_it_exists()).MustNotHaveHappened();
         }
 
@@ -257,7 +257,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.version_the_database("SomePath", "SomeVersion");
-            StringAssert.Contains("-DryRun-Would version DbName database with version SomeVersion based on path \"SomePath\"", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would version DbName database with version SomeVersion based on path \"SomePath\"", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.insert_version_and_get_version_id(A.Dummy<String>(), A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();
         }
 
@@ -266,7 +266,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(false);
             sut.record_script_in_scripts_run_table_is_dry_run_safe("SomeName", "SomeSQL", true, 0);
-            StringAssert.Contains("Recording SomeName script ran on ServerName - DbName.", sut.checkDebugLog.ToString());
+            StringAssert.Contains(" -> Recording SomeName script ran on ServerName - DbName.", sut.checkDebugLog.ToString());
             A.CallTo(() => sut.database.insert_script_run(A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), A.Dummy<bool>(), A.Dummy<long>())).WithAnyArguments().MustHaveHappened();
         }
 
@@ -276,7 +276,7 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.record_script_in_scripts_run_table_is_dry_run_safe("SomeName", "SomeSQL", true, 0);
-            StringAssert.Contains("-DryRun-Would record SomeName script ran on ServerName - DbName in the ScriptsRunTable table.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would record SomeName script ran on ServerName - DbName in the ScriptsRunTable table.", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.insert_script_run(A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), A.Dummy<bool>(), A.Dummy<long>())).WithAnyArguments().MustNotHaveHappened();
         }
 
@@ -289,7 +289,7 @@ namespace roundhouse.nunittests
             A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(), 
                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), 
                 A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
-        }        [Test]        public void RecordScriptInErrorsRun_WithDryRun_DoesNotRecordAndLogs()        {            var sut = MakeTestableSut(true);            sut.record_script_in_scripts_run_errors_table_is_dry_run_safe("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");            StringAssert.Contains("-DryRun-Would have recorded SomeName script ran with error on ServerName - DbName in the ScriptsRunErrorsTable table.",                 sut.checkInfoLog.ToString());            A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();        }
+        }        [Test]        public void RecordScriptInErrorsRun_WithDryRun_DoesNotRecordAndLogs()        {            var sut = MakeTestableSut(true);            sut.record_script_in_scripts_run_errors_table_is_dry_run_safe("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");            StringAssert.Contains(" -> Would have recorded SomeName script ran with error on ServerName - DbName in the ScriptsRunErrorsTable table.",                 sut.checkInfoLog.ToString());            A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();        }
 
         [Test]
         [TestCase(true)]
@@ -326,8 +326,8 @@ namespace roundhouse.nunittests
         {
             var sut = MakeTestableSut(true);
             sut.RunAllTheSqlStatements("SomeSQL", "SomeName", true, 1, "SomeVersion", "SomePath", ConnectionType.Default);
-            StringAssert.Contains("  * Would have run SomeName on ServerName - DbName.", sut.checkInfoLog.ToString());
-            StringAssert.Contains("-DryRun-Would record SomeName script ran on ServerName - DbName", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would have run SomeName on ServerName - DbName.", sut.checkInfoLog.ToString());
+            StringAssert.Contains(" -> Would record SomeName script ran on ServerName - DbName", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.run_sql("SomeSQL", ConnectionType.Default)).WithAnyArguments().MustNotHaveHappened();
         }
 
