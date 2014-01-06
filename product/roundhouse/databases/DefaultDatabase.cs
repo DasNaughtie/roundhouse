@@ -286,12 +286,29 @@ namespace roundhouse.databases
             }
             catch (Exception ex)
             {
-                Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for " +
-                    "retrieving versions at this time.",
-                    GetType(), provider);
+                if (configuration.DryRun)
+                {
+                    Log.bound_to(this).log_an_info_event_containing("{0}{0}", System.Environment.NewLine);
+                    Log.bound_to(this).log_an_info_event_containing("    Error: Ran into a problem while trying to get the database version. This");
+                    Log.bound_to(this).log_an_info_event_containing("           is probably because you haven't run RoundhousE on this database");
+                    Log.bound_to(this).log_an_info_event_containing("           before. DryRun doesn't work unless you've created the RoundhousE");
+                    Log.bound_to(this).log_an_info_event_containing("           support tables. You can create them by running RoundhousE against");
+                    Log.bound_to(this).log_an_info_event_containing("           the database WITHOUT the dryrun switch.");
+                    Log.bound_to(this).log_an_info_event_containing("{0}{0}", System.Environment.NewLine);
+                    
+                    Log.bound_to(this).log_an_info_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
+                        GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
 
-                Log.bound_to(this).log_a_warning_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
-                    GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
+                    throw new InvalidOperationException("DryRun without support tables.");
+                }
+                else { 
+                    Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for " +
+                        "retrieving versions at this time.",
+                        GetType(), provider);
+
+                    Log.bound_to(this).log_a_warning_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
+                        GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
+                }
             }
 
             return version;

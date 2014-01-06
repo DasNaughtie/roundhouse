@@ -100,7 +100,16 @@ namespace roundhouse.runners
                     log_and_run_support_tasks();
 
                     string new_version = version_resolver.resolve_version();
-                    var version_id = log_and_run_version_the_database(new_version);
+                    long version_id = 0;
+                    try
+                    {
+                        version_id = log_and_run_version_the_database(new_version);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        // this is where we bug out if in dry run and no support tables
+                        return;
+                    }
 
                     run_out_side_of_transaction_folder(known_folders.before_migration, version_id, new_version);
                     
@@ -191,10 +200,6 @@ namespace roundhouse.runners
             }
             else
             {
-                log_info_event_on_bound_logger("{0}{0} Creating the database using this script: {1}",
-                    System.Environment.NewLine,
-                    this.get_custom_create_database_script()
-                    );
                 return database_migrator.create_or_restore_database(get_custom_create_database_script());
             }
         }
@@ -221,9 +226,9 @@ namespace roundhouse.runners
 
         private void log_action_starting()
         {
-            this.log_separation_line(true);
+            this.log_separation_line(true, true);
             log_info_event_on_bound_logger("Setup, Backup, Create/Restore/Drop");
-            this.log_separation_line(true);
+            this.log_separation_line(true, false);
         }
 
         private void log_and_traverse_known_folders(long version_id, string new_version, bool database_was_created)
@@ -260,16 +265,16 @@ namespace roundhouse.runners
 
         private void log_migration_scripts()
         {
-            log_separation_line(true);
+            log_separation_line(true, true);
             log_info_event_on_bound_logger("Migration Scripts");
-            log_separation_line(true);
+            log_separation_line(true, false);
         }
 
         private long log_and_run_version_the_database(string new_version)
         {
-            log_separation_line(true);
+            log_separation_line(true, true);
             log_info_event_on_bound_logger("Versioning");
-            log_separation_line(true);
+            log_separation_line(true, false);
             var current_version = database_migrator.get_current_version(repository_path);
             if (configuration.DryRun)
             {
@@ -292,12 +297,12 @@ namespace roundhouse.runners
 
         private void log_and_run_support_tasks()
         {
-            this.log_separation_line(true);
+            this.log_separation_line(true, true);
             log_info_event_on_bound_logger("RoundhousE Structure");
-            this.log_separation_line(true);
+            this.log_separation_line(true, false);
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger("{0}{0}-DryRun- Would have run roundhouse support tasks on database {1}",
+                log_info_event_on_bound_logger("-DryRun-Would have run roundhouse support tasks on database {1}",
                     System.Environment.NewLine,
                     database_migrator.database.database_name
                     );
@@ -305,8 +310,13 @@ namespace roundhouse.runners
             database_migrator.run_roundhouse_support_tasks();
         }
 
-        private void log_separation_line(bool isThick)
+        private void log_separation_line(bool isThick, bool leadingNewline)
         {
+            if (leadingNewline)
+            {
+                log_info_event_on_bound_logger(System.Environment.NewLine);
+            }
+
             if (isThick)
             {
                 log_info_event_on_bound_logger("{0}", "=".PadRight(LINE_WIDTH, '='));
@@ -411,25 +421,14 @@ namespace roundhouse.runners
 
         public void log_and_traverse(MigrationsFolder folder, long version_id, string new_version, ConnectionType connection_type)
         {
-            log_separation_line(false);
+            log_separation_line(false, false);
 
-            if (configuration.DryRun)
-            {
-                log_info_event_on_bound_logger("-DryRun-Looking for {0} scripts in \"{1}\"{2}{3}",
-                                                                folder.friendly_name,
-                                                                folder.folder_full_path,
-                                                                folder.should_run_items_in_folder_once ? " (one-time only scripts)." : string.Empty,
-                                                                folder.should_run_items_in_folder_every_time ? " (every time scripts)" : string.Empty);
-            }
-            else
-            {
-                log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\"{2}{3}",
-                                                                folder.friendly_name,
-                                                                folder.folder_full_path,
-                                                                folder.should_run_items_in_folder_once ? " (one-time only scripts)." : string.Empty,
-                                                                folder.should_run_items_in_folder_every_time ? " (every time scripts)" : string.Empty);
+            log_info_event_on_bound_logger("Looking for {0} scripts in \"{1}\"{2}{3}",
+                                                            folder.friendly_name,
+                                                            folder.folder_full_path,
+                                                            folder.should_run_items_in_folder_once ? " (one-time only scripts)." : string.Empty,
+                                                            folder.should_run_items_in_folder_every_time ? " (every time scripts)" : string.Empty);
 
-            }
             traverse_files_and_run_sql(folder.folder_full_path, version_id, folder, environment, new_version, connection_type);
         }
 

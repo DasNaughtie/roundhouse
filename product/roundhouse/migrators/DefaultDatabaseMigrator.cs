@@ -198,23 +198,20 @@ namespace roundhouse.migrators
 
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger(" -DryRun-Would run database type specific tasks.");
-                // TODO (PMO): Overselling my hand?
-                log_info_event_on_bound_logger("  Warning: If RoundhousE support tables aren't in this database the information");
-                log_info_event_on_bound_logger("           in this dry run will be unreliable.");
+                log_info_event_on_bound_logger("-DryRun-Would run database type specific tasks.");
                 //database.run_database_specific_tasks();
-                log_info_event_on_bound_logger(" -DryRun-Would create [{0}] table if it didn't exist.", database.version_table_name);
-                log_info_event_on_bound_logger(" -DryRun-Would create [{0}] table if it didn't exist.", database.scripts_run_table_name);
-                log_info_event_on_bound_logger(" -DryRun-Would create [{0}] table if it didn't exist.", database.scripts_run_errors_table_name);
+                log_info_event_on_bound_logger(" -> Would create [{0}] table if it didn't exist.", database.version_table_name);
+                log_info_event_on_bound_logger(" -> Would create [{0}] table if it didn't exist.", database.scripts_run_table_name);
+                log_info_event_on_bound_logger(" -> Would create [{0}] table if it didn't exist.", database.scripts_run_errors_table_name);
                 // TODO (PMO): Make sure the RoundHouse support tasks make it into the drop folder
             }
             else
             {
-                log_info_event_on_bound_logger(" Running database type specific tasks.");
+                log_info_event_on_bound_logger("Running database type specific tasks.");
                 database.run_database_specific_tasks();
-                log_info_event_on_bound_logger(" Creating [{0}] table if it doesn't exist.", database.version_table_name);
-                log_info_event_on_bound_logger(" Creating [{0}] table if it doesn't exist.", database.scripts_run_table_name);
-                log_info_event_on_bound_logger(" Creating [{0}] table if it doesn't exist.", database.scripts_run_errors_table_name);
+                log_info_event_on_bound_logger(" -> Creating [{0}] table if it doesn't exist.", database.version_table_name);
+                log_info_event_on_bound_logger(" -> Creating [{0}] table if it doesn't exist.", database.scripts_run_table_name);
+                log_info_event_on_bound_logger(" -> Creating [{0}] table if it doesn't exist.", database.scripts_run_errors_table_name);
                 database.create_or_update_roundhouse_tables();
             }
 
@@ -242,26 +239,25 @@ namespace roundhouse.migrators
         {
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger("-DryRun-Would have deleted {0} database on {1} server if it existed.", database.database_name, database.server_name);
+                log_info_event_on_bound_logger(" -> Would have deleted {0} database on {1} server if it existed.", database.database_name, database.server_name);
             }
             else
             {
-                log_info_event_on_bound_logger("Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
+                log_info_event_on_bound_logger(" -> Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
                 database.delete_database_if_it_exists();
             }
         }
 
-        public long version_the_database(string repository_path, string repository_version)
-        {
+        public long version_the_database(string repository_path, string repository_version) {
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger(" -DryRun-Would version {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
+                log_info_event_on_bound_logger(" -> Would version {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
                 // TODO (PMO): Make it return a realistic version number
                 return 0;
             }
             else
             {
-                log_info_event_on_bound_logger(" Versioning {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
+                log_info_event_on_bound_logger(" -> Versioning {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
                 return database.insert_version_and_get_version_id(repository_path, repository_version);
             }
         }
@@ -272,14 +268,19 @@ namespace roundhouse.migrators
 
             handle_one_time_already_run(sql_to_run, script_name, run_this_script_once, repository_version, repository_path);
 
-            if (this_is_an_environment_file_and_its_in_the_right_environment(script_name, environment)
-                && this_script_should_run(script_name, sql_to_run, run_this_script_once, run_this_script_every_time))
+            // run once so we don't write to the screen twice
+            var good_environment_file   = this_is_an_environment_file_and_its_in_the_right_environment(script_name, environment);
+            var is_not_environment_file = this_is_not_an_environment_file(script_name);
+            var script_should_run       = this_script_should_run(script_name, sql_to_run, run_this_script_once, run_this_script_every_time);
+
+            if ((good_environment_file || is_not_environment_file) && script_should_run)
             {
                 run_all_the_sql_statements(sql_to_run, script_name, run_this_script_once, version_id, repository_version, repository_path, connection_type);
                 this_sql_ran = true;
             }
-            else
+            else if (is_not_environment_file)
             {
+                // exclude good_environment files because they already printed to the screen that the file was skipped.
                 log_info_event_on_bound_logger("    Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
             }
 
@@ -298,7 +299,7 @@ namespace roundhouse.migrators
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(
-                    "  * Would have run {0} on {1} - {2}.",
+                    " -> Would have run {0} on {1} - {2}.",
                     script_name,
                     database.server_name,
                     database.database_name);
@@ -308,7 +309,7 @@ namespace roundhouse.migrators
             else
             {
                 log_info_event_on_bound_logger(
-                    "  * Running {0} on {1} - {2}.",
+                    " -> Running {0} on {1} - {2}.",
                     script_name,
                     database.server_name,
                     database.database_name);
@@ -425,11 +426,11 @@ namespace roundhouse.migrators
         {
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger("-DryRun-Would record {0} script ran on {1} - {2} in the {3} table.", script_name, database.server_name, database.database_name, database.scripts_run_table_name);
+                log_info_event_on_bound_logger(" -> Would record {0} script ran on {1} - {2} in the {3} table.", script_name, database.server_name, database.database_name, database.scripts_run_table_name);
             }
             else
             {
-                log_debug_event_on_bound_logger("Recording {0} script ran on {1} - {2}.", script_name, database.server_name, database.database_name);
+                log_debug_event_on_bound_logger(" -> Recording {0} script ran on {1} - {2}.", script_name, database.server_name, database.database_name);
                 database.insert_script_run(script_name, sql_to_run, create_hash(sql_to_run), run_this_script_once, version_id);
             }
         }
@@ -438,13 +439,13 @@ namespace roundhouse.migrators
         {
             if (configuration.DryRun)
             {
-                log_info_event_on_bound_logger("-DryRun-Would have recorded {0} script ran with error on {1} - {2} in the {3} table.",
+                log_info_event_on_bound_logger(" -> Would have recorded {0} script ran with error on {1} - {2} in the {3} table.",
                     script_name, database.server_name, database.database_name,
                     database.scripts_run_errors_table_name);
             }
             else
             {
-                log_debug_event_on_bound_logger("Recording {0} script ran with error on {1} - {2}.", script_name, database.server_name, database.database_name);
+                log_debug_event_on_bound_logger(" -> Recording {0} script ran with error on {1} - {2}.", script_name, database.server_name, database.database_name);
                 database.insert_script_run_error(script_name, sql_to_run, sql_erroneous_part, error_message, repository_version, repository_path);
             }
         }
@@ -563,10 +564,9 @@ namespace roundhouse.migrators
         public bool this_is_an_environment_file_and_its_in_the_right_environment(string script_name, Environment environment)
         {
             log_debug_event_on_bound_logger("Checking to see if {0} is an environment file. We are in the {1} environment.", script_name, environment.name);
-            if (!script_name.to_lower().Contains(".env."))
+            if (this_is_not_an_environment_file(script_name))
             {
-                // return true because this is NOT an environment file for the next check
-                return true;
+                return false;
             }
 
             bool environment_file_is_in_the_right_environment = script_name.to_lower().StartsWith(environment.name.to_lower() + ".");
@@ -576,10 +576,31 @@ namespace roundhouse.migrators
                 environment_file_is_in_the_right_environment = true;
             }
 
-            log_info_event_on_bound_logger(" {0} is an environment file. We are in the {1} environment. This will{2} run based on this check.",
-                                                            script_name, environment.name, environment_file_is_in_the_right_environment ? string.Empty : " NOT");
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(
+                    " {3} {0} is an environment file. We are in the {1} environment. This would{2} have run.",
+                    script_name,
+                    environment.name,
+                    environment_file_is_in_the_right_environment ? string.Empty : " NOT",
+                    environment_file_is_in_the_right_environment ? "->" : "  ");
+            }
+            else
+            {
+                log_info_event_on_bound_logger(
+                    " {3} {0} is an environment file. We are in the {1} environment. This will{2} run.",
+                    script_name,
+                    environment.name,
+                    environment_file_is_in_the_right_environment ? string.Empty : " NOT",
+                    environment_file_is_in_the_right_environment ? "->" : "  ");
+            }
 
             return environment_file_is_in_the_right_environment;
+        }
+
+        public static bool this_is_not_an_environment_file(string script_name)
+        {
+            return !script_name.to_lower().Contains(".env.");
         }
     }
 }
