@@ -128,6 +128,8 @@
 
         public bool DryRun { get; set; }
 
+        public bool ExploreChangeDrop { get; set; }
+
         public bool Baseline { get; set; }
 
         public bool RunAllAnyTimeScripts { get; set; }

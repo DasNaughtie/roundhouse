@@ -299,6 +299,9 @@ namespace roundhouse.console
                 .Add("dryrun",
                      "DryRun - This instructs RH to log what would have run, but not to actually run anything against the database. Use this option if you are trying to figure out what RH is going to do.",
                      option => configuration.DryRun = option != null)
+                .Add("explore",
+                    "Explore - This instructs RH to open a Windows Explorer window pointed to the change_drop folder after it runs. Useful for seeing the scripts that ran (or would have run during a dry run).",
+                    option => configuration.ExploreChangeDrop = option != null)
                 .Add("searchallinsteadoftraverse=|searchallsubdirectoriesinsteadoftraverse=",
                      "SearchAllSubdirectoriesInsteadOfTraverse - Each Migration folder's subdirectories are traversed by default. This option pulls back scripts from the main directory and all subdirectories at once. Defaults to 'false'",
                      option => configuration.SearchAllSubdirectoriesInsteadOfTraverse = option != null)
@@ -348,6 +351,7 @@ namespace roundhouse.console
                         "/disabletokenreplacement " +
                         "/baseline " +
                         "/dryrun " +
+                        "/explore " +
                         "/search[allsubdirectories]insteadoftraverse" +
                         "]", Environment.NewLine);
                 show_help(usage_message, option_set);

@@ -3,6 +3,8 @@ using NHibernate.Cfg;
 namespace roundhouse.runners
 {
     using System;
+    using System.Diagnostics;
+
     using databases;
     using folders;
     using infrastructure;
@@ -170,6 +172,11 @@ namespace roundhouse.runners
             {
                 database_migrator.database.Dispose();
                 //copy_log_file_to_change_drop_folder();
+
+                if (configuration.ExploreChangeDrop)
+                {
+                    Process.Start(known_folders.change_drop.folder_full_path);
+                }
             }
         }
 
