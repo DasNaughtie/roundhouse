@@ -53,6 +53,7 @@ namespace roundhouse.infrastructure.app
         bool Debug { get; set; }
         bool DryRun { get; set; }
         bool ExploreChangeDrop { get; set; }
+        bool SimpleOutput { get; set; }
         bool Baseline { get; set; }
         bool RunAllAnyTimeScripts { get; set; }
         bool DisableTokenReplacement { get; set; }

@@ -37,6 +37,7 @@ namespace roundhouse.unittests
         // Quick stub checks
         public bool CheckChangeDropFolderCreated = false;
         public StringBuilder CheckLogWritten     = new StringBuilder();
+        public StringBuilder CheckDebugLog       = new StringBuilder();
         public StringBuilder CheckWarningWritten = new StringBuilder();
         public StringBuilder CheckFilesCopied    = new StringBuilder();
 
@@ -77,6 +78,11 @@ namespace roundhouse.unittests
         protected override void create_change_drop_folder()
         {
             CheckChangeDropFolderCreated = true;
+        }
+
+        protected override void log_debug_event_on_bound_logger(string message, params object[] args)
+        {
+            CheckDebugLog.AppendFormat(message, args);
         }
 
         protected override void log_info_event_on_bound_logger(string message, params object[] args)
@@ -126,6 +132,11 @@ namespace roundhouse.unittests
         {
             CheckFilesCopied.AppendFormat("{0} -> {1}{2}", sql_file_ran, destination_file, System.Environment.NewLine);
         }
+
+        public void CopyToChangeDropFolder(string sql_file_ran, Folder migration_folder)
+        {
+            base.copy_to_change_drop_folder(sql_file_ran, migration_folder);
+        }
     }
 
     [TestFixture]
@@ -138,7 +149,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithNormalConfiguration_LogsThatWeAreAboutToKick()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.run();
             StringAssert.Contains("Please press enter when ready to kick", sut.CheckLogWritten.ToString());
             Assert.AreEqual(true, sut.CheckChangeDropFolderCreated);
@@ -149,7 +160,7 @@ namespace roundhouse.unittests
         [TestCase(false, "This is a dry run", false)]
         public void Run_WithOrWithoutDryRun_LogsAppropriateInfoActions(bool isDryRun, string testString, bool shouldContain)
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(isDryRun);
+            var sut = MakeTestableRoundhouseMigrationRunner(isDryRun, false);
             sut.run();
             if (shouldContain)
             {
@@ -164,7 +175,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_WillDropDatabase()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.dropping_the_database = true;
             sut.run();
             A.CallTo(() => sut.database_migrator.open_admin_connection()).MustHaveHappened();
@@ -177,7 +188,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_WillNotDropDatabaseButWillCallMethodAndLog()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.dropping_the_database = true;
             sut.run();
             StringAssert.Contains("would have removed database (DbName)", sut.CheckLogWritten.ToString());
@@ -188,7 +199,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_WillNotCreateTheDatabase()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.dont_create_the_database = false;
             sut.run();
             A.CallTo(() => sut.database_migrator.create_or_restore_database(A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
@@ -197,7 +208,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_WillCreateTheDatabase()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.dont_create_the_database = false;
             sut.run();
             A.CallTo(() => sut.database_migrator.create_or_restore_database(A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
@@ -209,7 +220,7 @@ namespace roundhouse.unittests
         public void Run_WithoutDryRun_WillSetRecoveryMode(RecoveryMode recoveryMode)
         {
 
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.fakeConfiguration.RecoveryMode = recoveryMode;
             sut.run();
             A.CallTo(() => sut.database_migrator.open_connection(true)).WithAnyArguments().MustHaveHappened();
@@ -222,7 +233,7 @@ namespace roundhouse.unittests
         public void Run_WithDryRun_WillCallRecoveryMode(RecoveryMode recoveryMode, string expected)
         {
 
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.fakeConfiguration.RecoveryMode = recoveryMode;
             sut.run();
             StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
@@ -274,7 +285,7 @@ namespace roundhouse.unittests
             bool supportsTransaction,
             string notExpected)
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.run_in_a_transaction = runInTransaction;
             if (supportsTransaction)
             {
@@ -291,7 +302,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_DoesRunRoundhouseSupportTasks()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.run();
             StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
@@ -300,7 +311,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_RunsSupportTasks()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.run();
             StringAssert.DoesNotContain("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
@@ -309,7 +320,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_DoesCallVersionTheDatabaseBecauseItIsDryRunSafe()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.run();
             StringAssert.Contains("Would have migrated database DbName from version 1 to 2", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.database_migrator.get_current_version(REPO_PATH)).MustHaveHappened();
@@ -319,7 +330,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_DoesInsertNewVersionRowIntoTheDatabase()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.run();
             StringAssert.Contains("Migrating DbName from version 1 to 2", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.database_migrator.get_current_version(REPO_PATH)).MustHaveHappened();
@@ -329,7 +340,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_DoesLogAndTraverseFoldersBecauseRunSqlIsDryRunSafe()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             A.CallTo(() => sut.database_migrator.run_sql("", "", true, true, 0, A.Dummy<Environment>(), "", "", A.Dummy<ConnectionType>())).WithAnyArguments().Returns(true);
             sut.run();
             StringAssert.Contains("Looking for friendly-alter scripts in \"" + FOLDER_PATH + "\\alter\" (every time scripts)", sut.CheckLogWritten.ToString());
@@ -341,7 +352,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_DoesLogAndTraverseFolders()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             A.CallTo(() => sut.database_migrator.run_sql("", "", true, true, 0, A.Dummy<Environment>(), "", "", A.Dummy<ConnectionType>())).WithAnyArguments().Returns(true);
             sut.run();
             StringAssert.Contains("Looking for friendly-alter scripts in \"" + FOLDER_PATH + "\\alter\" (every time scripts)", sut.CheckLogWritten.ToString());
@@ -353,7 +364,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRun_TellsYouYourDatabaseWasKicked()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.run();
             StringAssert.IsMatch("RoundhousE v([0-9.]*) has kicked your database \\(DbName\\)\\! You are now at version " + NEW_DB_VERSION + 
                 "\\. All changes and backups can be found at \"" + FOLDER_PATH + "\\\\change_drop\"", sut.CheckLogWritten.ToString());
@@ -362,7 +373,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRun_TellsYouYourDatabaseWouldHaveBeenKicked()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.run();
             StringAssert.IsMatch("-DryRun-RoundhousE v([0-9.]*) would have kicked your database \\(DbName\\)\\! You would be at version " + NEW_DB_VERSION
                 + "\\. All changes and backups can be found at \"" + FOLDER_PATH + "\\\\change_drop\"", sut.CheckLogWritten.ToString());
@@ -371,7 +382,7 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithoutDryRunAndDatabaseDropRequested_DropsTheDatabase()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(false);
+            var sut = MakeTestableRoundhouseMigrationRunner(false, false);
             sut.dropping_the_database = true;
             sut.run();
             StringAssert.Contains("RoundhousE has removed database (DbName). All changes and backups can be found at \"" + FOLDER_PATH + "\\change_drop\"", sut.CheckLogWritten.ToString());
@@ -380,19 +391,47 @@ namespace roundhouse.unittests
         [Test]
         public void Run_WithDryRunAndDatabaseDropRequested_DoesntDropTheDatabase()
         {
-            var sut = MakeTestableRoundhouseMigrationRunner(true);
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.dropping_the_database = true;
             sut.run();
             StringAssert.Contains("-DryRun-RoundhousE would have removed database (DbName). All changes and backups would be found at \"" + FOLDER_PATH + "\\change_drop\"", sut.CheckLogWritten.ToString());
         }
 
-        private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun)
+        [Test]
+        public void CopyToChangeDropFolder_WithoutSimpleOutput_PutsOutputInMigrationFoldersWithoutNumbers()
+        {
+            var sut        = MakeTestableRoundhouseMigrationRunner(false, false);
+            var dropFolder = MakeMigrationsFolder("folderName", A.Dummy<bool>(), A.Dummy<bool>());
+            sut.CopyToChangeDropFolder("folder1\\file1.sql", dropFolder);
+            sut.CopyToChangeDropFolder("folder2\\file2.sql", dropFolder);
+            sut.CopyToChangeDropFolder("folder3\\file3.sql", dropFolder);
+            StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\itemsRan\\folder1\\file1.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\itemsRan\\folder2\\file2.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\itemsRan\\folder3\\file3.sql", sut.CheckFilesCopied.ToString());
+        }
+
+
+        [Test]
+        public void CopyToChangeDropFolder_WithSimpleOutput_PutsOutputInChangeDropFolderWithNumbers()
+        {
+            var sut        = MakeTestableRoundhouseMigrationRunner(false, true);
+            var dropFolder = MakeMigrationsFolder("folderName", A.Dummy<bool>(), A.Dummy<bool>());
+            sut.CopyToChangeDropFolder("folder1\\file1.sql", dropFolder);
+            sut.CopyToChangeDropFolder("folder2\\file2.sql", dropFolder);
+            sut.CopyToChangeDropFolder("folder3\\file3.sql", dropFolder);
+            StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\scripts\\100_file1.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\scripts\\101_file2.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\scripts\\102_file3.sql", sut.CheckFilesCopied.ToString());
+        }
+        
+        private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun, bool simpleOutput)
         {
             var sut                                   = new TestableRoundhouseMigrationRunner();
             sut.fakeConfiguration.DryRun              = dryRun;
+            sut.fakeConfiguration.SimpleOutput        = simpleOutput;
             sut.fakeDbMigrator.database.database_name = "DbName";
             sut.dropping_the_database                 = false;
-            A.CallTo(() => sut.fakeKnownFolders.change_drop)
+            A.CallTo(()                               => sut.fakeKnownFolders.change_drop)
                 .Returns(MakeMigrationsFolder("change_drop", true, false));
             A.CallTo(() => sut.fakeKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
             A.CallTo(() => sut.fakeKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
