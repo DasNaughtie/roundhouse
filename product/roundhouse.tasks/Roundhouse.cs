@@ -130,6 +130,8 @@
 
         public bool ExploreChangeDrop { get; set; }
 
+        public bool SimpleOutput { get; set; }
+
         public bool Baseline { get; set; }
 
         public bool RunAllAnyTimeScripts { get; set; }

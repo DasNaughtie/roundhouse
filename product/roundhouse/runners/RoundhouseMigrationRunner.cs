@@ -34,6 +34,8 @@ namespace roundhouse.runners
 
         private const int LINE_WIDTH = 72;
 
+        private static int simple_output_file_number = 100;
+
         public RoundhouseMigrationRunner(
             string repository_path,
             Environment environment,
@@ -602,12 +604,29 @@ namespace roundhouse.runners
             return TokenReplacer.replace_tokens(configuration, sql_text);
         }
 
-        private void copy_to_change_drop_folder(string sql_file_ran, Folder migration_folder)
+        protected virtual void copy_to_change_drop_folder(string sql_file_ran, Folder migration_folder)
         {
             if (!configuration.DisableOutput)
             {
-                string destination_file = file_system.combine_paths(known_folders.change_drop.folder_full_path, "itemsRan",
-                                                                    sql_file_ran.Replace(migration_folder.folder_path + "\\", string.Empty));
+                string destination_file;
+                if (configuration.SimpleOutput)
+                {
+                    destination_file = file_system.combine_paths(
+                        known_folders.change_drop.folder_full_path,
+                        "scripts",
+                        String.Format(
+                            "{0}_{1}",
+                            simple_output_file_number,
+                            file_system.get_file_name_from(sql_file_ran)));
+                    simple_output_file_number++;
+                }
+                else
+                {
+                    destination_file = file_system.combine_paths(
+                        known_folders.change_drop.folder_full_path,
+                        "itemsRan",
+                        sql_file_ran.Replace(migration_folder.folder_path + "\\", string.Empty));
+                }
                 file_system.verify_or_create_directory(file_system.get_directory_name_from(destination_file));
                 log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(sql_file_ran), destination_file);
                 file_copy_unsafe(sql_file_ran, destination_file);
