@@ -168,6 +168,11 @@ namespace roundhouse.databases
             return database.generate_create_database_script(custom_create_database_script);
         }
 
+        public string generate_database_specific_script()
+        {
+            return database.generate_database_specific_script();
+        }
+
         public string create_database_script(string custom_create_database_script)
         {
             return string.Empty;
@@ -184,6 +189,11 @@ namespace roundhouse.databases
         public void set_recovery_mode(bool simple)
         {
             Log.bound_to(this).log_an_info_event_containing("Changing the database recovery mode if it has one to {0}", simple ? "simple" : "full");
+        }
+
+        public string generate_recovery_mode_script()
+        {
+            return database.generate_recovery_mode_script();
         }
 
         public void backup_database(string output_path_minus_database)

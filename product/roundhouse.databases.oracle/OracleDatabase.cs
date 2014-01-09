@@ -92,15 +92,23 @@ namespace roundhouse.databases.oracle
             ((OracleConnection)connection).InfoMessage += (sender, e) => Log.bound_to(this).log_a_debug_event_containing("  [SQL PRINT]: {0}{1}", Environment.NewLine, e.Message);
         }
 
+        public override string generate_database_specific_script()
+        {
+            var sql1 = create_sequence_script(version_table_name);
+            var sql2 = create_sequence_script(scripts_run_table_name);
+            var sql3 = create_sequence_script(scripts_run_errors_table_name);
+            return String.Format("{0};\r\n{1};\r\n{2};", sql1, sql2, sql3);
+        }
+
         public override string run_database_specific_tasks()
         {
+            var sqlToRun = generate_database_specific_script();
+            run_sql(sqlToRun, ConnectionType.Default);
+
             Log.bound_to(this).log_an_info_event_containing("Creating a sequence for the '{0}' table.", version_table_name);
-            var sql1 = run_sql(create_sequence_script(version_table_name), ConnectionType.Default);
             Log.bound_to(this).log_an_info_event_containing("Creating a sequence for the '{0}' table.", scripts_run_table_name);
-            var sql2 = run_sql(create_sequence_script(scripts_run_table_name), ConnectionType.Default);
             Log.bound_to(this).log_an_info_event_containing("Creating a sequence for the '{0}' table.", scripts_run_errors_table_name);
-            var sql3 = run_sql(create_sequence_script(scripts_run_errors_table_name), ConnectionType.Default);
-            return String.Format("{0};\r\n{1};\r\n{2};", sql1, sql2, sql3);
+            return sqlToRun;
         }
 
         public string create_sequence_script(string table_name)

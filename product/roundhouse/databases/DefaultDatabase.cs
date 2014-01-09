@@ -12,6 +12,7 @@ namespace roundhouse.databases
     using NHibernate;
     using NHibernate.Cfg;
     using NHibernate.Criterion;
+    using NHibernate.Hql.Ast.ANTLR;
     using NHibernate.Tool.hbm2ddl;
     using parameters;
     using sqlsplitters;
@@ -83,6 +84,11 @@ namespace roundhouse.databases
         public abstract string set_recovery_mode_script(bool simple);
         public abstract string restore_database_script(string restore_from_path, string custom_restore_options);
         public abstract string delete_database_script();
+
+        public virtual string generate_database_specific_script()
+        {
+            return string.Empty;
+        }
 
         public virtual bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
@@ -156,6 +162,11 @@ namespace roundhouse.databases
                     "{0} with provider {1} does not provide a facility for setting recovery mode to simple at this time.{2}{3}",
                     GetType(), provider, Environment.NewLine, ex.Message);
             }
+        }
+
+        public string generate_recovery_mode_script()
+        {
+            return set_recovery_mode_script(configuration.RecoveryMode == RecoveryMode.Simple);
         }
 
         public void backup_database(string output_path_minus_database)

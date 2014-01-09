@@ -81,6 +81,11 @@ namespace roundhouse.databases.sqlserver2000
             return string.Format("Server={0};initial catalog={1};{2}", server_name, database_name, connection_options);
         }
 
+        public override string generate_database_specific_script()
+        {
+            return string.Empty;
+        }
+
         public override string run_database_specific_tasks()
         {
 
@@ -88,8 +93,10 @@ namespace roundhouse.databases.sqlserver2000
             //this.roundhouse_schema_name;
             //TODO: Create user
 
+            var sql = generate_database_specific_script();
+
             //run_sql(set_recovery_mode_script(simple)
-            return string.Empty;
+            return sql;
         }
 
         public override string create_database_script()
