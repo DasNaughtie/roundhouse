@@ -18,7 +18,7 @@ namespace roundhouse.migrators
         bool create_or_restore_database(string custom_create_database_script);
         void set_recovery_mode(bool simple);
         //void restore_database(string restore_from_path);
-        void delete_database();
+        string delete_database();
         void run_roundhouse_support_tasks();
         string get_current_version(string repository_path);
         long version_the_database(string repository_path, string repository_version);

@@ -89,15 +89,7 @@ namespace roundhouse.databases
             bool database_was_created = false;
             try
             {
-                string create_script = create_database_script();
-                if (!string.IsNullOrEmpty(custom_create_database_script))
-                {
-                    create_script = custom_create_database_script;
-                    if (!configuration.DisableTokenReplacement)
-                    {
-                        create_script = TokenReplacer.replace_tokens(configuration, create_script);
-                    }
-                }
+                var create_script = generate_create_database_script(custom_create_database_script);
 
                 if (split_batch_statements)
                 {
@@ -126,6 +118,20 @@ namespace roundhouse.databases
             }
 
             return database_was_created;
+        }
+
+        public string generate_create_database_script(string custom_create_database_script)
+        {
+            string create_script = create_database_script();
+            if (!string.IsNullOrEmpty(custom_create_database_script))
+            {
+                create_script = custom_create_database_script;
+                if (!configuration.DisableTokenReplacement)
+                {
+                    create_script = TokenReplacer.replace_tokens(configuration, create_script);
+                }
+            }
+            return create_script;
         }
 
         private bool? run_sql_scalar_boolean(string sql_to_run, ConnectionType connection_type)
@@ -179,11 +185,11 @@ namespace roundhouse.databases
             }
         }
 
-        public virtual void delete_database_if_it_exists()
+        public virtual string delete_database_if_it_exists()
         {
             try
             {
-                run_sql(delete_database_script(), ConnectionType.Admin);
+                return run_sql(delete_database_script(), ConnectionType.Admin);
             }
             catch (Exception ex)
             {
@@ -194,7 +200,7 @@ namespace roundhouse.databases
             }
         }
 
-        public abstract void run_database_specific_tasks();
+        public abstract string run_database_specific_tasks();
 
         public virtual void create_or_update_roundhouse_tables()
         {
@@ -202,10 +208,11 @@ namespace roundhouse.databases
             s.Execute(false, true);
         }
 
-        public virtual void run_sql(string sql_to_run, ConnectionType connection_type)
+        public virtual string run_sql(string sql_to_run, ConnectionType connection_type)
         {
             Log.bound_to(this).log_a_debug_event_containing("[SQL] Running (on connection '{0}'): {1}{2}", connection_type.ToString(), Environment.NewLine, sql_to_run);
             run_sql(sql_to_run, connection_type, null);
+            return sql_to_run;
         }
 
         public virtual object run_sql_scalar(string sql_to_run, ConnectionType connection_type)
@@ -214,7 +221,7 @@ namespace roundhouse.databases
             return run_sql_scalar(sql_to_run, connection_type, null);
         }
 
-        protected abstract void run_sql(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters);
+        protected abstract string run_sql(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters);
         protected abstract object run_sql_scalar(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters);
 
         public void insert_script_run(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id)

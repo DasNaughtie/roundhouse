@@ -148,6 +148,16 @@ namespace roundhouse.databases
             database.rollback();
         }
 
+        public string create_database_script()
+        {
+            return database.create_database_script();
+        }
+
+        public string generate_create_database_script(string custom_create_database_script)
+        {
+            return database.generate_create_database_script(custom_create_database_script);
+        }
+
         public bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
             return database.create_database_if_it_doesnt_exist(custom_create_database_script);
@@ -191,14 +201,19 @@ namespace roundhouse.databases
             command_timeout = current_timeout;
         }
 
-        public void delete_database_if_it_exists()
+        public string delete_database_if_it_exists()
         {
-            database.delete_database_if_it_exists();
+            return database.delete_database_if_it_exists();
         }
 
-        public void run_database_specific_tasks()
+        public string delete_database_script()
         {
-            database.run_database_specific_tasks();
+            return string.Empty;
+        }
+
+        public string run_database_specific_tasks()
+        {
+            return database.run_database_specific_tasks();
         }
 
         public void create_or_update_roundhouse_tables()
@@ -206,9 +221,9 @@ namespace roundhouse.databases
             database.create_or_update_roundhouse_tables();
         }
 
-        public void run_sql(string sql_to_run,ConnectionType connection_type)
+        public string run_sql(string sql_to_run,ConnectionType connection_type)
         {
-            database.run_sql(sql_to_run,connection_type);
+            return database.run_sql(sql_to_run,connection_type);
         }    
         
         public object run_sql_scalar(string sql_to_run,ConnectionType connection_type)

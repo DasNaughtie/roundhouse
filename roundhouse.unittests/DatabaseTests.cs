@@ -23,9 +23,10 @@ namespace roundhouse.nunittests
         // Check variables
         public StringBuilder CheckSqlRan = new StringBuilder();
 
-        public override void run_sql(string sql_to_run, ConnectionType connection_type)
+        public override string run_sql(string sql_to_run, ConnectionType connection_type)
         {
             CheckSqlRan.Append(sql_to_run);
+            return sql_to_run;
         }
     }
 
@@ -81,6 +82,22 @@ namespace roundhouse.nunittests
             var sut = MakeTestableSut();
             var returnVal = sut.run_sql("some sql", A.Dummy<ConnectionType>());
             Assert.AreEqual("some sql", returnVal);
+        }
+
+        [Test]
+        public void RunDatabaseSpecificTasks_ForAnyDatabase_ReturnsSqlItRan()
+        {
+            var sut = MakeTestableSut();
+            var retVal = sut.run_database_specific_tasks();
+            StringAssert.Contains("CREATE SCHEMA [SomeSchema]", retVal);
+        }
+
+        [Test]
+        public void DeleteDatabaseIfItExists_ForAnyDatabase_ReturnsSqlItRan()
+        {
+            var sut = MakeTestableSut();
+            var retVal = sut.delete_database_if_it_exists();
+            StringAssert.Contains("DROP DATABASE [SomeDb]", retVal);
         }
 
         // test factories

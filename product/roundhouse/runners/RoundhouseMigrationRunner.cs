@@ -4,6 +4,7 @@ namespace roundhouse.runners
 {
     using System;
     using System.Diagnostics;
+    using System.IO;
 
     using databases;
     using folders;
@@ -200,14 +201,10 @@ namespace roundhouse.runners
 
         protected virtual bool create_or_restore_the_database()
         {
-            if (configuration.DryRun)
-            {
-                return database_migrator.create_or_restore_database(get_custom_create_database_script());
-            }
-            else
-            {
-                return database_migrator.create_or_restore_database(get_custom_create_database_script());
-            }
+            var retVal = database_migrator.create_or_restore_database(get_custom_create_database_script());
+            var script = database_migrator.database.generate_create_database_script(get_custom_create_database_script());
+            put_script_in_change_drop_for_database_command("CreateOrRestoreDatabase", script, true);
+            return retVal;
         }
 
         protected virtual void log_info_event_on_bound_logger(string message, params object[] args)
@@ -382,6 +379,22 @@ namespace roundhouse.runners
             }
         }
 
+        protected virtual void put_script_in_change_drop_for_database_command(string fileName, string sqlScript, bool beforeUpScript)
+        {
+            // create temp file from string
+            var folderDest    = beforeUpScript ? known_folders.run_before_up.folder_full_path : known_folders.run_after_other_any_time_scripts.folder_full_path;
+            var newScriptPath = file_system.combine_paths(folderDest, fileName + ".sql");
+            File.WriteAllText(newScriptPath, sqlScript);
+            if (beforeUpScript)
+            {
+                copy_to_change_drop_folder(newScriptPath, known_folders.run_before_up); 
+            }
+            else
+            {
+                copy_to_change_drop_folder(newScriptPath, known_folders.run_after_other_any_time_scripts); 
+            }
+        }
+
         protected virtual void drop_the_database()
         {
             if (configuration.DryRun)
@@ -392,13 +405,16 @@ namespace roundhouse.runners
                     ApplicationParameters.name,
                     database_migrator.database.database_name,
                     known_folders.change_drop.folder_full_path);
-                database_migrator.delete_database();
+                var script = database_migrator.delete_database();
+                put_script_in_change_drop_for_database_command("DropDatabase", script, true);
                 database_migrator.close_connection();
             }
             else
             {
                 database_migrator.open_admin_connection();
                 database_migrator.delete_database();
+                var script = database_migrator.delete_database();
+                put_script_in_change_drop_for_database_command("DropDatabase", script, true);
                 database_migrator.close_admin_connection();
                 database_migrator.close_connection();
                 log_info_event_on_bound_logger(
@@ -581,7 +597,7 @@ namespace roundhouse.runners
             return TokenReplacer.replace_tokens(configuration, sql_text);
         }
 
-        protected virtual void copy_to_change_drop_folder(string sql_file_ran, Folder migration_folder)
+        protected virtual void copy_to_change_drop_folder(string path_to_sql_file, Folder migration_folder)
         {
             if (!configuration.DisableOutput)
             {
@@ -594,7 +610,7 @@ namespace roundhouse.runners
                         String.Format(
                             "{0}_{1}",
                             simple_output_file_number,
-                            file_system.get_file_name_from(sql_file_ran)));
+                            file_system.get_file_name_from(path_to_sql_file)));
                     simple_output_file_number++;
                 }
                 else
@@ -602,11 +618,11 @@ namespace roundhouse.runners
                     destination_file = file_system.combine_paths(
                         known_folders.change_drop.folder_full_path,
                         "itemsRan",
-                        sql_file_ran.Replace(migration_folder.folder_path + "\\", string.Empty));
+                        path_to_sql_file.Replace(migration_folder.folder_path + "\\", string.Empty));
                 }
                 file_system.verify_or_create_directory(file_system.get_directory_name_from(destination_file));
-                log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(sql_file_ran), destination_file);
-                file_copy_unsafe(sql_file_ran, destination_file);
+                log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(path_to_sql_file), destination_file);
+                file_copy_unsafe(path_to_sql_file, destination_file);
             }
         }
 

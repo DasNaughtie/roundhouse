@@ -235,17 +235,21 @@ namespace roundhouse.migrators
             return current_version;
         }
 
-        public void delete_database()
+        public string delete_database()
         {
+            string delete_script;
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(" -> Would have deleted {0} database on {1} server if it existed.", database.database_name, database.server_name);
+                delete_script = database.delete_database_script();
             }
             else
             {
                 log_info_event_on_bound_logger(" -> Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
-                database.delete_database_if_it_exists();
+                delete_script = database.delete_database_if_it_exists();
             }
+
+            return delete_script;
         }
 
         public long version_the_database(string repository_path, string repository_version) {

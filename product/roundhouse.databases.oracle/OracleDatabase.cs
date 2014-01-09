@@ -92,14 +92,15 @@ namespace roundhouse.databases.oracle
             ((OracleConnection)connection).InfoMessage += (sender, e) => Log.bound_to(this).log_a_debug_event_containing("  [SQL PRINT]: {0}{1}", Environment.NewLine, e.Message);
         }
 
-        public override void run_database_specific_tasks()
+        public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_an_info_event_containing("Creating a sequence for the '{0}' table.", version_table_name);
-            run_sql(create_sequence_script(version_table_name), ConnectionType.Default);
+            var sql1 = run_sql(create_sequence_script(version_table_name), ConnectionType.Default);
             Log.bound_to(this).log_an_info_event_containing("Creating a sequence for the '{0}' table.", scripts_run_table_name);
-            run_sql(create_sequence_script(scripts_run_table_name), ConnectionType.Default);
+            var sql2 = run_sql(create_sequence_script(scripts_run_table_name), ConnectionType.Default);
             Log.bound_to(this).log_an_info_event_containing("Creating a sequence for the '{0}' table.", scripts_run_errors_table_name);
-            run_sql(create_sequence_script(scripts_run_errors_table_name), ConnectionType.Default);
+            var sql3 = run_sql(create_sequence_script(scripts_run_errors_table_name), ConnectionType.Default);
+            return String.Format("{0};\r\n{1};\r\n{2};", sql1, sql2, sql3);
         }
 
         public string create_sequence_script(string table_name)
@@ -141,11 +142,12 @@ namespace roundhouse.databases.oracle
             return Convert.ToInt64(run_sql_scalar(get_version_id_script(), ConnectionType.Default, select_parameters));
         }
 
-        public override void run_sql(string sql_to_run, ConnectionType connection_type)
+        public override string run_sql(string sql_to_run, ConnectionType connection_type)
         {
             Log.bound_to(this).log_a_debug_event_containing("Replacing script text \r\n with \n to be compliant with Oracle.");
             // http://www.barrydobson.com/2009/02/17/pls-00103-encountered-the-symbol-when-expecting-one-of-the-following/
             base.run_sql(sql_to_run.Replace("\r\n", "\n"), connection_type);
+            return sql_to_run;
         }
 
         protected override object run_sql_scalar(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters)

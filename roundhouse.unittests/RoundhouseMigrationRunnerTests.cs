@@ -206,6 +206,41 @@ namespace roundhouse.unittests
         }
 
         [Test]
+        public void DropTheDatabase_WithoutDryRun_CopiesDropScriptToChangeDropFolder()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(false, true);
+            sut.dropping_the_database = true;
+            sut.run();
+            StringAssert.Contains("_DropDatabase.sql", sut.CheckFilesCopied.ToString());
+        }
+
+        [Test]
+        public void DropTheDatabase_WithDryRun_CopiesDropScriptToChangeDropFolder()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(true, true);
+            sut.dropping_the_database = true;
+            sut.run();
+            StringAssert.Contains("_DropDatabase.sql", sut.CheckFilesCopied.ToString());
+        }
+
+        [Test]
+        public void Run_WithoutDryRun_CreatesCreateDatabaseScript()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(false, true);
+            sut.dont_create_the_database = false;
+            A.CallTo(() => sut.database_migrator.create_or_restore_database(A.Dummy<String>())).WithAnyArguments().Returns(true);
+            sut.run();
+            StringAssert.Contains("_CreateOrRestoreDatabase.sql", sut.CheckFilesCopied.ToString());
+        }
+
+        [Test]
+        public void Run_WithoutDryRunAndSimpleModeRecovery_CreatesScriptForIt()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(false, true);
+            sut.recovery_mode = simple;
+        }
+
+        [Test]
         public void Run_WithoutDryRun_WillCreateTheDatabase()
         {
             var sut = MakeTestableRoundhouseMigrationRunner(false, false);

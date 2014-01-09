@@ -93,20 +93,21 @@ namespace roundhouse.databases.sqlserver
             ((SqlConnection)connection).InfoMessage += (sender, e) => Log.bound_to(this).log_a_debug_event_containing("  [SQL PRINT]: {0}{1}", Environment.NewLine, e.Message);
         }
 
-        public override void run_database_specific_tasks()
+        public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_an_info_event_containing(" -> Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
-            create_roundhouse_schema_if_it_doesnt_exist();
+            var sql = create_roundhouse_schema_if_it_doesnt_exist();
 
             Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: This should remove a user named RoundhousE if one exists (migration from SQL2000 up)");
             //TODO: Delete RoundhousE user if it exists (i.e. migration from SQL2000 to 2005)
+            return sql;
         }
 
-        public void create_roundhouse_schema_if_it_doesnt_exist()
+        public string create_roundhouse_schema_if_it_doesnt_exist()
         {
             try
             {
-                run_sql(create_roundhouse_schema_script(),ConnectionType.Default);
+                return run_sql(create_roundhouse_schema_script(),ConnectionType.Default);
             }
             catch (Exception ex)
             {
@@ -115,6 +116,7 @@ namespace roundhouse.databases.sqlserver
                 //    "Either the schema has already been created OR {0} with provider {1} does not provide a facility for creating roundhouse schema at this time.{2}{3}",
                 //    GetType(), provider, Environment.NewLine, ex.Message);
             }
+            return string.Empty;
         }
 
         public string create_roundhouse_schema_script()
