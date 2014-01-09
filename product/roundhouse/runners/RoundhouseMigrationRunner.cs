@@ -195,7 +195,8 @@ namespace roundhouse.runners
         {
             if (configuration.RecoveryMode != RecoveryMode.NoChange)
             {
-                database_migrator.set_recovery_mode(configuration.RecoveryMode == RecoveryMode.Simple);
+                var script = database_migrator.set_recovery_mode(configuration.RecoveryMode == RecoveryMode.Simple);
+                put_script_in_change_drop_for_database_command("SetRecoveryMode", script, true);
             }
         }
 
@@ -311,6 +312,8 @@ namespace roundhouse.runners
                     );
             }
             database_migrator.run_roundhouse_support_tasks();
+            var script = database_migrator.database.generate_database_specific_script();
+            put_script_in_change_drop_for_database_command("DatabaseSpecificTasks", script, true);
         }
 
         private void log_separation_line(bool isThick, bool leadingNewline)
@@ -382,17 +385,22 @@ namespace roundhouse.runners
         protected virtual void put_script_in_change_drop_for_database_command(string fileName, string sqlScript, bool beforeUpScript)
         {
             // create temp file from string
-            var folderDest    = beforeUpScript ? known_folders.run_before_up.folder_full_path : known_folders.run_after_other_any_time_scripts.folder_full_path;
-            var newScriptPath = file_system.combine_paths(folderDest, fileName + ".sql");
-            File.WriteAllText(newScriptPath, sqlScript);
-            if (beforeUpScript)
-            {
-                copy_to_change_drop_folder(newScriptPath, known_folders.run_before_up); 
-            }
-            else
-            {
-                copy_to_change_drop_folder(newScriptPath, known_folders.run_after_other_any_time_scripts); 
-            }
+            var tempFileName = Path.GetTempFileName();
+            File.WriteAllText(tempFileName, sqlScript);
+
+            copy_to_change_drop_folder(
+                tempFileName,
+                fileName + ".sql",
+                beforeUpScript ? known_folders.run_before_up : known_folders.run_after_other_any_time_scripts);
+        }
+
+        private string create_temporary_file(string fileName)
+        {
+            var newScriptPath = file_system.combine_paths(file_system.get_temp_folder(), fileName + ".sql");
+            // in case it was already there
+            File.Delete(newScriptPath);
+            File.Create(newScriptPath);
+            return newScriptPath;
         }
 
         protected virtual void drop_the_database()
@@ -569,7 +577,7 @@ namespace roundhouse.runners
         {
             try
             {
-                copy_to_change_drop_folder(sql_file, migration_folder);
+                copy_to_change_drop_folder(sql_file, null, migration_folder);
             }
             catch (Exception ex)
             {
@@ -597,33 +605,54 @@ namespace roundhouse.runners
             return TokenReplacer.replace_tokens(configuration, sql_text);
         }
 
-        protected virtual void copy_to_change_drop_folder(string path_to_sql_file, Folder migration_folder)
+        protected virtual void copy_to_change_drop_folder(string path_to_sql_file, string new_script_name, Folder migration_folder)
         {
             if (!configuration.DisableOutput)
             {
-                string destination_file;
+                string destination_file_path;
                 if (configuration.SimpleOutput)
                 {
-                    destination_file = file_system.combine_paths(
+                    var destination_file_name = get_destination_file_name(path_to_sql_file, new_script_name, true);
+                    destination_file_path = file_system.combine_paths(
                         known_folders.change_drop.folder_full_path,
                         "scripts",
-                        String.Format(
-                            "{0}_{1}",
-                            simple_output_file_number,
-                            file_system.get_file_name_from(path_to_sql_file)));
+                        String.Format("{0}_{1}", simple_output_file_number, destination_file_name));
                     simple_output_file_number++;
                 }
                 else
                 {
-                    destination_file = file_system.combine_paths(
+                    var destination_file_name = get_destination_file_name(path_to_sql_file, new_script_name, false);
+                    destination_file_path = file_system.combine_paths(
                         known_folders.change_drop.folder_full_path,
                         "itemsRan",
-                        path_to_sql_file.Replace(migration_folder.folder_path + "\\", string.Empty));
+                        migration_folder.folder_name,
+                        destination_file_name.Replace(migration_folder.folder_path + "\\", string.Empty));
                 }
-                file_system.verify_or_create_directory(file_system.get_directory_name_from(destination_file));
-                log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(path_to_sql_file), destination_file);
-                file_copy_unsafe(path_to_sql_file, destination_file);
+                file_system.verify_or_create_directory(file_system.get_directory_name_from(destination_file_path));
+                log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(path_to_sql_file), destination_file_path);
+                file_copy_unsafe(path_to_sql_file, destination_file_path);
             }
+        }
+
+        private string get_destination_file_name(string path_to_sql_file, string new_script_name, bool strip_out_folder_names)
+        {
+            string destination_file_name;
+            if (String.IsNullOrEmpty(new_script_name))
+            {
+                if (strip_out_folder_names)
+                {
+                    destination_file_name = file_system.get_file_name_from(path_to_sql_file);
+                }
+                else
+                {
+                    destination_file_name = path_to_sql_file;
+                }
+            }
+            else
+            {
+                destination_file_name = new_script_name;
+            }
+            return destination_file_name;
         }
 
         protected virtual void file_copy_unsafe(string sql_file_ran, string destination_file)

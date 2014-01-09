@@ -93,11 +93,15 @@ namespace roundhouse.databases.sqlserver
             ((SqlConnection)connection).InfoMessage += (sender, e) => Log.bound_to(this).log_a_debug_event_containing("  [SQL PRINT]: {0}{1}", Environment.NewLine, e.Message);
         }
 
+        public override string generate_database_specific_script()
+        {
+            return create_roundhouse_schema_if_it_doesnt_exist();
+        }
+
         public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_an_info_event_containing(" -> Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
-            var sql = create_roundhouse_schema_if_it_doesnt_exist();
-
+            var sql = generate_database_specific_script();
             Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: This should remove a user named RoundhousE if one exists (migration from SQL2000 up)");
             //TODO: Delete RoundhousE user if it exists (i.e. migration from SQL2000 to 2005)
             return sql;

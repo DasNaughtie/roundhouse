@@ -74,14 +74,10 @@ namespace roundhouse.infrastructure.filesystem
             file.Read(buffer, 0, 5);
             file.Close();
 
-            if (buffer[0] == 0xef && buffer[1] == 0xbb && buffer[2] == 0xbf)
-                enc = Encoding.UTF8;
-            else if (buffer[0] == 0xfe && buffer[1] == 0xff)
-                enc = Encoding.Unicode;
-            else if (buffer[0] == 0 && buffer[1] == 0 && buffer[2] == 0xfe && buffer[3] == 0xff)
-                enc = Encoding.UTF32;
-            else if (buffer[0] == 0x2b && buffer[1] == 0x2f && buffer[2] == 0x76)
-                enc = Encoding.UTF7;
+            if (buffer[0] == 0xef && buffer[1] == 0xbb && buffer[2] == 0xbf) enc = Encoding.UTF8;
+            else if (buffer[0] == 0xfe && buffer[1] == 0xff) enc = Encoding.Unicode;
+            else if (buffer[0] == 0 && buffer[1] == 0 && buffer[2] == 0xfe && buffer[3] == 0xff) enc = Encoding.UTF32;
+            else if (buffer[0] == 0x2b && buffer[1] == 0x2f && buffer[2] == 0x76) enc = Encoding.UTF7;
 
             return enc;
         }
@@ -94,7 +90,11 @@ namespace roundhouse.infrastructure.filesystem
         /// <param name="overwrite_the_existing_file">If there is an existing file already there, would you like to delete it?</param>
         public void file_copy(string source_file_name, string destination_file_name, bool overwrite_the_existing_file)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Attempting to copy from \"{0}\" to \"{1}\".", source_file_name, destination_file_name);
+            Log.bound_to(this)
+                .log_a_debug_event_containing(
+                    "Attempting to copy from \"{0}\" to \"{1}\".",
+                    source_file_name,
+                    destination_file_name);
             File.Copy(source_file_name, destination_file_name, overwrite_the_existing_file);
         }
 
@@ -104,9 +104,16 @@ namespace roundhouse.infrastructure.filesystem
         /// <param name="source_file_name">Where is the file now?</param>
         /// <param name="destination_file_name">Where would you like it to go?</param>
         /// <param name="overwrite_the_existing_file">If there is an existing file already there, would you like to delete it?</param>
-        public void file_copy_unsafe(string source_file_name, string destination_file_name, bool overwrite_the_existing_file)
+        public void file_copy_unsafe(
+            string source_file_name,
+            string destination_file_name,
+            bool overwrite_the_existing_file)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Attempting to copy from \"{0}\" to \"{1}\".", source_file_name, destination_file_name);
+            Log.bound_to(this)
+                .log_a_debug_event_containing(
+                    "Attempting to copy from \"{0}\" to \"{1}\".",
+                    source_file_name,
+                    destination_file_name);
             //Private Declare Function apiCopyFile Lib "kernel32" Alias "CopyFileA" _
             int success = CopyFileA(source_file_name, destination_file_name, overwrite_the_existing_file ? 0 : 1);
 
@@ -150,8 +157,11 @@ namespace roundhouse.infrastructure.filesystem
                 //check the directory to be sure
                 DirectoryInfo directory_info = get_directory_info_from(file.DirectoryName);
                 is_system_file = ((directory_info.Attributes & FileAttributes.System) == FileAttributes.System);
-                Log.bound_to(this).log_a_debug_event_containing("Is directory \"{0}\" a system directory? {1}", file.DirectoryName,
-                                    is_system_file.to_string());
+                Log.bound_to(this)
+                    .log_a_debug_event_containing(
+                        "Is directory \"{0}\" a system directory? {1}",
+                        file.DirectoryName,
+                        is_system_file.to_string());
             }
             else
             {
@@ -168,7 +178,11 @@ namespace roundhouse.infrastructure.filesystem
         public bool is_encrypted_file(FileInfo file)
         {
             bool is_encrypted = ((file.Attributes & FileAttributes.Encrypted) == FileAttributes.Encrypted);
-            Log.bound_to(this).log_a_debug_event_containing("Is file \"{0}\" an encrypted file? {1}", file.FullName, is_encrypted.to_string());
+            Log.bound_to(this)
+                .log_a_debug_event_containing(
+                    "Is file \"{0}\" an encrypted file? {1}",
+                    file.FullName,
+                    is_encrypted.to_string());
             return is_encrypted;
         }
 
@@ -180,15 +194,22 @@ namespace roundhouse.infrastructure.filesystem
         /// <returns>True if the file in question has a file type in the list</returns>
         public bool file_in_file_types(string file_name, string[] file_types)
         {
-            if (Array.IndexOf(file_types, ".*") > -1 || Array.IndexOf(file_types, get_file_extension_from(file_name).to_lower()) > -1)
+            if (Array.IndexOf(file_types, ".*") > -1
+                || Array.IndexOf(file_types, get_file_extension_from(file_name).to_lower()) > -1)
             {
-                Log.bound_to(this).log_a_debug_event_containing("File \"{0}\" is in the approved file types of \"{1}\".", file_name,
-                                    string.Join(";", file_types));
+                Log.bound_to(this)
+                    .log_a_debug_event_containing(
+                        "File \"{0}\" is in the approved file types of \"{1}\".",
+                        file_name,
+                        string.Join(";", file_types));
                 return true;
             }
 
-            Log.bound_to(this).log_an_info_event_containing("File \"{0}\" is not in the approved file types of \"{1}\".", file_name,
-                               string.Join(";", file_types));
+            Log.bound_to(this)
+                .log_an_info_event_containing(
+                    "File \"{0}\" is not in the approved file types of \"{1}\".",
+                    file_name,
+                    string.Join(";", file_types));
             return false;
         }
 
@@ -201,8 +222,8 @@ namespace roundhouse.infrastructure.filesystem
         {
             FileInfo file = get_file_info_from(file_path);
             return file.CreationTime < file.LastWriteTime
-                                  ? file.CreationTime.Date.ToString("yyyyMMdd")
-                                  : file.LastWriteTime.Date.ToString("yyyyMMdd");
+                ? file.CreationTime.Date.ToString("yyyyMMdd")
+                : file.LastWriteTime.Date.ToString("yyyyMMdd");
         }
 
         /// <summary>
@@ -253,16 +274,19 @@ namespace roundhouse.infrastructure.filesystem
                 }
                 catch (SystemException e)
                 {
-                    Log.bound_to(this).log_an_error_event_containing("Cannot create directory \"{0}\". Error was:{1}{2}",
-                                        get_full_path(directory),
-                                        Environment.NewLine, e
-                        );
+                    Log.bound_to(this)
+                        .log_an_error_event_containing(
+                            "Cannot create directory \"{0}\". Error was:{1}{2}",
+                            get_full_path(directory),
+                            Environment.NewLine,
+                            e);
                     throw;
                 }
             }
             else
             {
-                Log.bound_to(this).log_a_debug_event_containing("Directory \"{0}\" already exists", get_full_path(directory));
+                Log.bound_to(this)
+                    .log_a_debug_event_containing("Directory \"{0}\" already exists", get_full_path(directory));
             }
         }
 
@@ -313,7 +337,8 @@ namespace roundhouse.infrastructure.filesystem
         /// <returns>A directory information object for use after creating the directory</returns>
         public DirectoryInfo create_directory(string directory)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Attempting to create directory \"{0}\".", get_full_path(directory));
+            Log.bound_to(this)
+                .log_a_debug_event_containing("Attempting to create directory \"{0}\".", get_full_path(directory));
             return Directory.CreateDirectory(directory);
         }
 
@@ -324,7 +349,8 @@ namespace roundhouse.infrastructure.filesystem
         /// <param name="recursive">Would you like to delete the directories inside of this directory? Almost always true.</param>
         public void delete_directory(string directory, bool recursive)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Attempting to delete directory \"{0}\".", get_full_path(directory));
+            Log.bound_to(this)
+                .log_a_debug_event_containing("Attempting to delete directory \"{0}\".", get_full_path(directory));
             Directory.Delete(directory, recursive);
         }
 
@@ -357,20 +383,20 @@ namespace roundhouse.infrastructure.filesystem
         public string[] get_all_file_name_strings_in(string directory, string pattern)
         {
             string[] returnList = Directory.GetFiles(directory, pattern);
-			return returnList.OrderBy(get_file_name_from).ToArray();
+            return returnList.OrderBy(get_file_name_from).ToArray();
         }
 
-		/// <summary>
-		/// Gets a list of all files inside of an existing directory, includes files in subdirectories also
-		/// </summary>
-		/// <param name="directory">Path to the directory</param>
-		/// <param name="pattern">Pattern or extension</param>
-		/// <returns>A list of files inside of an existing directory</returns>
-		public string[] get_all_file_name_strings_recurevly_in(string directory, string pattern)
-		{
-			string[] returnList = Directory.GetFiles(directory, pattern, SearchOption.AllDirectories);
-			return returnList.OrderBy(get_file_name_from).ToArray();
-		}
+        /// <summary>
+        /// Gets a list of all files inside of an existing directory, includes files in subdirectories also
+        /// </summary>
+        /// <param name="directory">Path to the directory</param>
+        /// <param name="pattern">Pattern or extension</param>
+        /// <returns>A list of files inside of an existing directory</returns>
+        public string[] get_all_file_name_strings_recurevly_in(string directory, string pattern)
+        {
+            string[] returnList = Directory.GetFiles(directory, pattern, SearchOption.AllDirectories);
+            return returnList.OrderBy(get_file_name_from).ToArray();
+        }
 
         #endregion
 
@@ -400,5 +426,9 @@ namespace roundhouse.infrastructure.filesystem
             return combined_path;
         }
 
+        public string get_temp_folder()
+        {
+            return Path.GetTempPath();
+        }
     }
 }

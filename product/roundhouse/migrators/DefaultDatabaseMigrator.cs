@@ -173,7 +173,7 @@ namespace roundhouse.migrators
             }
         }
 
-        public void set_recovery_mode(bool simple)
+        public string set_recovery_mode(bool simple)
         {
             if (configuration.DryRun)
             {
@@ -186,6 +186,7 @@ namespace roundhouse.migrators
                 database.set_recovery_mode(simple);
                 //database.close_connection();
             }
+            return database.generate_recovery_mode_script();
         }
 
         public void run_roundhouse_support_tasks()

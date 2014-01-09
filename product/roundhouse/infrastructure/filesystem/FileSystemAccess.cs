@@ -214,5 +214,7 @@ namespace roundhouse.infrastructure.filesystem
         /// <param name="paths">Each item in order from left to right of the path</param>
         /// <returns></returns>
         string combine_paths(params string[] paths);
+
+        string get_temp_folder();
     }
 }

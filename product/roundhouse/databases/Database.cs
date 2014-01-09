@@ -97,8 +97,11 @@ namespace roundhouse.databases
         // (---)
         string generate_create_database_script(string custom_create_database_script);
 
+        string generate_database_specific_script();
+
         bool create_database_if_it_doesnt_exist(string custom_create_database_script);
         void set_recovery_mode(bool simple);
+        string generate_recovery_mode_script();
         void backup_database(string output_path_minus_database);
         void restore_database(string restore_from_path, string custom_restore_options);
         string delete_database_if_it_exists();

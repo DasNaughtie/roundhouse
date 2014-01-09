@@ -124,10 +124,15 @@
             return string.Empty;
         }
 
+        public override string generate_database_specific_script()
+        {
+            return string.Empty;
+        }
+
         public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_a_debug_event_containing("Sqlite has no database specific tasks. Moving along now...");
-            return string.Empty;
+            return generate_database_specific_script();
         }
 
         public override string set_recovery_mode_script(bool simple)
