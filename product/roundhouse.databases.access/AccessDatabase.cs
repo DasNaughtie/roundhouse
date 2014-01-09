@@ -101,10 +101,11 @@ namespace roundhouse.databases.access
             return string.Format("Provider=SQLNCLI;Server={0};Database={1};{2}", server_name, database_name, connection_options);
         }
 
-        public override void run_database_specific_tasks()
+        public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_a_debug_event_containing("Access has no specific database tasks. Returning...");
             //TODO: Anything for Access?
+            return string.Empty;
         }
 
         public override string create_database_script()

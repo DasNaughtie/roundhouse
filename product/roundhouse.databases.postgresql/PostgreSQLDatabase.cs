@@ -7,6 +7,9 @@ namespace roundhouse.databases.postgresql
     using infrastructure.app;
     using infrastructure.extensions;
     using infrastructure.logging;
+
+    using NHibernate.Hql.Ast.ANTLR;
+
     using Npgsql;
 
     public class PostgreSQLDatabase : AdoNetDatabase
@@ -148,9 +151,10 @@ namespace roundhouse.databases.postgresql
                     ConnectionType.Default);
         }
 
-        public override void run_database_specific_tasks()
+        public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_a_debug_event_containing("PostgreSQL has no database specific tasks. Moving along now...");
+            return string.Empty;
         }
     }
 }

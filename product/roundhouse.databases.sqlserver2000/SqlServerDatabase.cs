@@ -81,7 +81,7 @@ namespace roundhouse.databases.sqlserver2000
             return string.Format("Server={0};initial catalog={1};{2}", server_name, database_name, connection_options);
         }
 
-        public override void run_database_specific_tasks()
+        public override string run_database_specific_tasks()
         {
 
             Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: Should create a user by the name of RoundhousE.");
@@ -89,6 +89,7 @@ namespace roundhouse.databases.sqlserver2000
             //TODO: Create user
 
             //run_sql(set_recovery_mode_script(simple)
+            return string.Empty;
         }
 
         public override string create_database_script()

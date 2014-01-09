@@ -158,6 +158,21 @@ namespace roundhouse.databases
             database.rollback();
         }
 
+        public string create_database_script()
+        {
+            return string.Empty;
+        }
+
+        public string generate_create_database_script(string custom_create_database_script)
+        {
+            return database.generate_create_database_script(custom_create_database_script);
+        }
+
+        public string create_database_script(string custom_create_database_script)
+        {
+            return string.Empty;
+        }
+
         public bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
             //TODO: Don't allow creation of the database - record everything from here on out as something that would run
@@ -183,19 +198,26 @@ namespace roundhouse.databases
             throw new ApplicationException(message);
         }
 
-        public void delete_database_if_it_exists()
+        public string delete_database_if_it_exists()
         {
             //TODO: Determine whether the database exists
             //database.delete_database_if_it_exists();
+            return delete_database_script();
         }
 
-        public void run_database_specific_tasks()
+        public string delete_database_script()
+        {
+            return string.Empty;
+        }
+
+        public string run_database_specific_tasks()
         {
             if (!database_exists)
             {
                 //TODO: figure out whether we do this or not
                 //database.run_database_specific_tasks();
             }
+            return string.Empty;
         }
 
         public void create_or_update_roundhouse_tables()
@@ -203,10 +225,11 @@ namespace roundhouse.databases
             database.create_or_update_roundhouse_tables();
         }
 
-        public void run_sql(string sql_to_run,ConnectionType connection_type)
+        public string run_sql(string sql_to_run,ConnectionType connection_type)
         {
             Log.bound_to(this).log_an_info_event_containing("Running statemtent: {0}{1}", Environment.NewLine, sql_to_run);
-            //database.run_sql(sql_to_run);
+            //return database.run_sql(sql_to_run);
+            return string.Empty;
         }
         
         public object run_sql_scalar(string sql_to_run,ConnectionType connection_type)

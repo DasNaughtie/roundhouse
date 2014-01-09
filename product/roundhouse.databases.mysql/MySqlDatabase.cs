@@ -100,15 +100,19 @@ namespace roundhouse.databases.mysql
                 database_name);
         }
 
-        public override void run_database_specific_tasks()
+        public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_a_debug_event_containing("MySQL has no database specific tasks. Moving along now...");
+            return string.Empty;
         }
 
         // http://bugs.mysql.com/bug.php?id=46429
-        public override void run_sql(string sql_to_run, ConnectionType connection_type)
+        public override string run_sql(string sql_to_run, ConnectionType connection_type)
         {
-            if (string.IsNullOrEmpty(sql_to_run)) return;
+            if (string.IsNullOrEmpty(sql_to_run))
+            {
+                return sql_to_run;
+            }
 
             //TODO Investigate how pass CommandTimeout into commands which will be during MySqlScript execution.
             var connection = connection_type == ConnectionType.Admin
@@ -117,6 +121,7 @@ namespace roundhouse.databases.mysql
             
             var script = new MySqlScript(connection, sql_to_run);
             script.Execute();
+            return sql_to_run;
         }
 
         public override string set_recovery_mode_script(bool simple)

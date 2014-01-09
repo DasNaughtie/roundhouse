@@ -92,14 +92,21 @@ namespace roundhouse.databases
         void close_admin_connection();
         void rollback();
 
+        string create_database_script();
+
+        // (---)
+        string generate_create_database_script(string custom_create_database_script);
+
         bool create_database_if_it_doesnt_exist(string custom_create_database_script);
         void set_recovery_mode(bool simple);
         void backup_database(string output_path_minus_database);
         void restore_database(string restore_from_path, string custom_restore_options);
-        void delete_database_if_it_exists();
-        void run_database_specific_tasks();
+        string delete_database_if_it_exists();
+
+        string delete_database_script();
+        string run_database_specific_tasks();
         void create_or_update_roundhouse_tables();
-        void run_sql(string sql_to_run,ConnectionType connection_type);
+        string run_sql(string sql_to_run,ConnectionType connection_type);
         object run_sql_scalar(string sql_to_run, ConnectionType connection_type);
         void insert_script_run(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id);
         void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path);
