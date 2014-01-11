@@ -107,6 +107,47 @@ namespace roundhouse.databases.sqlserver
             return sql;
         }
 
+        public override long get_version_id_from_database()
+        {
+            var sql = "SELECT MAX(id) + 1 FROM [RoundhousE].[Version]";
+            long id = 1;
+            var version_from_database = run_sql_scalar(sql, ConnectionType.Default).ToString();
+            long.TryParse(version_from_database, out id);
+            return id;
+        }
+
+        public override string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            var sql = String.Format("exec sp_executesql N'INSERT INTO RoundhousE.ScriptsRun (version_id, script_name, text_of_script, text_hash, one_time_script, entry_date, modified_date, entered_by) VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7); select SCOPE_IDENTITY()',N'@p0 bigint,@p1 nvarchar(4000),@p2 nvarchar(max) ,@p3 nvarchar(4000),@p4 bit,@p5 datetime,@p6 datetime,@p7 nvarchar(4000)',@p0={0},@p1=N'{1}',@p2=N'{2}',@p3=N'{3}',@p4={4},@p5='{5}',@p6='{5}',@p7=N'{6}'",
+                version_id,
+                script_name,
+                sql_to_run.Replace("'", "''"),
+                sql_to_run_hash,
+                run_this_script_once,
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                user_name
+            );
+
+            return sql;
+        }
+
+        public override string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            var sql = String.Format("exec sp_executesql N'INSERT INTO RoundhousE.Version (repository_path, version, entry_date, modified_date, entered_by) VALUES (@p0, @p1, @p2, @p3, @p4); select SCOPE_IDENTITY()',N'@p0 nvarchar(4000),@p1 nvarchar(4000),@p2 datetime,@p3 datetime,@p4 nvarchar(4000)',@p0=N'{0}',@p1=N'{1}',@p2='{2}',@p3='{2}',@p4=N'{3}'",
+                repository_path,
+                repository_version,
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                user_name
+            );
+
+            return sql;
+        }
+
         public string create_roundhouse_schema_if_it_doesnt_exist()
         {
             try

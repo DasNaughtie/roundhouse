@@ -4,6 +4,8 @@ namespace roundhouse.databases
     using infrastructure.app;
     using infrastructure.persistence;
 
+    using roundhouse.infrastructure;
+
     public sealed class SqlServerLiteSpeedDatabase : Database
     {
         private readonly Database database;
@@ -18,6 +20,8 @@ namespace roundhouse.databases
             get { return database.configuration; }
             set { database.configuration = value; }
         }
+
+        public event CreateScriptHandler create_script_handler;
 
         public string connection_string
         {
@@ -246,6 +250,16 @@ namespace roundhouse.databases
             database.insert_script_run(script_name, sql_to_run, sql_to_run_hash, run_this_script_once, version_id);
         }
 
+        public string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            return string.Empty;
+        }
+
         public void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
         {
             database.insert_script_run_error(script_name, sql_to_run, sql_erroneous_part, error_message, repository_version, repository_path);
@@ -256,9 +270,19 @@ namespace roundhouse.databases
             return database.get_version(repository_path);
         }
 
+        public long get_version_id_from_database()
+        {
+            return database.get_version_id_from_database();
+        }
+
         public long insert_version_and_get_version_id(string repository_path, string repository_version)
         {
             return database.insert_version_and_get_version_id(repository_path, repository_version);
+        }
+
+        public string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            return database.generate_insert_version_and_get_version_id_script(repository_path, repository_version);
         }
 
         public bool has_run_script_already(string script_name)

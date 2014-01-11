@@ -64,10 +64,13 @@ namespace roundhouse.databases
 {
     using System;
     using infrastructure.app;
-    
+
+    using roundhouse.infrastructure;
+
     public interface Database : IDisposable
     {
         ConfigurationPropertyHolder configuration { get; set; }
+
         string server_name { get; set; }
         string database_name { get; set; }
         string provider { get; set; }
@@ -112,10 +115,14 @@ namespace roundhouse.databases
         string run_sql(string sql_to_run,ConnectionType connection_type);
         object run_sql_scalar(string sql_to_run, ConnectionType connection_type);
         void insert_script_run(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id);
+        string generate_insert_scripts_run_script(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id);
         void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path);
 
         string get_version(string repository_path);
+
+        long get_version_id_from_database();
         long insert_version_and_get_version_id(string repository_path, string repository_version);
+        string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version);
         bool has_run_script_already(string script_name);
         string get_current_script_hash(string script_name);
         //object run_sql_scalar(string sql_to_run);

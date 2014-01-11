@@ -8,6 +8,7 @@ namespace roundhouse.unittests
     using System.Collections;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
+    using System.IO;
 
     using FakeItEasy;
     using NUnit.Framework;
@@ -136,7 +137,7 @@ namespace roundhouse.unittests
 
         public void CopyToChangeDropFolder(string sql_file_ran, Folder migration_folder)
         {
-            base.copy_to_change_drop_folder(sql_file_ran, null, migration_folder);
+            base.copy_to_change_drop_folder(sql_file_ran, null, migration_folder, ExecutionPhase.During);
         }
     }
 
@@ -212,7 +213,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(false, true);
             sut.dropping_the_database = true;
             sut.run();
-            StringAssert.Contains("_DropDatabase.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch(@"1\d\d_DropDatabase.sql", sut.CheckFilesCopied.ToString());
         }
 
         [Test]
@@ -221,7 +222,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(true, true);
             sut.dropping_the_database = true;
             sut.run();
-            StringAssert.Contains("_DropDatabase.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch(@"1\d\d_DropDatabase.sql", sut.CheckFilesCopied.ToString());
         }
 
         [Test]
@@ -235,14 +236,14 @@ namespace roundhouse.unittests
         }
 
         [Test]
-        [TestCase(RecoveryMode.Simple, "_SetRecoveryMode.sql")]
-        [TestCase(RecoveryMode.Full, "_SetRecoveryMode.sql")]
+        [TestCase(RecoveryMode.Simple, @"1\d\d_SetRecoveryMode.sql")]
+        [TestCase(RecoveryMode.Full, @"1\d\d_SetRecoveryMode.sql")]
         public void Run_WithSimpleOrFullModeRecovery_CreatesScriptForIt(RecoveryMode recoveryMode, string expectedFileName)
         {
             var sut = MakeTestableRoundhouseMigrationRunner(false, true);
             sut.fakeConfiguration.RecoveryMode = recoveryMode;
             sut.run();
-            StringAssert.Contains(expectedFileName, sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch(expectedFileName, sut.CheckFilesCopied.ToString());
         }
 
         [Test]
@@ -355,7 +356,7 @@ namespace roundhouse.unittests
             sut.run();
             StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
-            StringAssert.Contains("_DatabaseSpecificTasks.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch(@"1\d\d_DatabaseSpecificTasks.sql", sut.CheckFilesCopied.ToString());
         }
 
         [Test]
@@ -365,7 +366,7 @@ namespace roundhouse.unittests
             sut.run();
             StringAssert.DoesNotContain("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
-            StringAssert.Contains("_DatabaseSpecificTasks.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch(@"1\d\d_DatabaseSpecificTasks.sql", sut.CheckFilesCopied.ToString());
         }
 
         [Test]
@@ -470,9 +471,9 @@ namespace roundhouse.unittests
             sut.CopyToChangeDropFolder("folder1\\file1.sql", dropFolder);
             sut.CopyToChangeDropFolder("folder2\\file2.sql", dropFolder);
             sut.CopyToChangeDropFolder("folder3\\file3.sql", dropFolder);
-            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\\d\d\d_file1.sql", sut.CheckFilesCopied.ToString());
-            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\\d\d\d_file2.sql", sut.CheckFilesCopied.ToString());
-            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\\d\d\d_file3.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\2\d\d_file1.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\2\d\d_file2.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\2\d\d_file3.sql", sut.CheckFilesCopied.ToString());
         }
         
         private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun, bool simpleOutput)

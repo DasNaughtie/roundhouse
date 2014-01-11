@@ -15,6 +15,9 @@ namespace roundhouse.databases
     using NHibernate.Hql.Ast.ANTLR;
     using NHibernate.Tool.hbm2ddl;
     using parameters;
+
+    using roundhouse.infrastructure;
+
     using sqlsplitters;
     using Environment = System.Environment;
     using Version = model.Version;
@@ -22,6 +25,7 @@ namespace roundhouse.databases
     public abstract class DefaultDatabase<DBCONNECTION> : Database
     {
         public ConfigurationPropertyHolder configuration { get; set; }
+
         public string server_name { get; set; }
         public string database_name { get; set; }
         public string provider { get; set; }
@@ -259,6 +263,17 @@ namespace roundhouse.databases
             }
         }
 
+        public virtual string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            // todo: make this work for other databases (not just SQL server)
+            return string.Empty;
+        }
+
         public void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version,
                                             string repository_path)
         {
@@ -332,6 +347,11 @@ namespace roundhouse.databases
             return version;
         }
 
+        public virtual long get_version_id_from_database()
+        {
+            return 0;
+        }
+
         //get rid of the virtual
         public virtual long insert_version_and_get_version_id(string repository_path, string repository_version)
         {
@@ -356,6 +376,11 @@ namespace roundhouse.databases
             }
 
             return version_id;
+        }
+
+        public virtual string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            return string.Empty;
         }
 
         public string get_current_script_hash(string script_name)

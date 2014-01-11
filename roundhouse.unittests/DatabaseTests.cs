@@ -12,7 +12,9 @@ namespace roundhouse.nunittests
 
     using NUnit.Framework;
     using roundhouse.databases.sqlserver;
+    using roundhouse.infrastructure;
     using roundhouse.infrastructure.app;
+    using roundhouse.infrastructure.persistence;
 
     // remember SqlServerDatabase -> AdoNetDatabase -> DefaultDatabase<IDbConnection> -> Database
 
@@ -100,19 +102,32 @@ namespace roundhouse.nunittests
             StringAssert.Contains("DROP DATABASE [SomeDb]", retVal);
         }
 
+        [Test]
+        public void GenerateInsertVersionScript_ForSqlServerDatabase_ReturnsSql()
+        {
+            var sut = MakeTestableSut();
+            var retVal = sut.generate_insert_version_and_get_version_id_script("somePath", "someVersion");
+            StringAssert.IsMatch("INSERT INTO.*RoundhousE.*Version", retVal);
+        }
+
+        [Test]
+        public void GenerateInsertScriptsRunScript_ForSqlServerDatabase_ReturnsSql()
+        {
+            var sut = MakeTestableSut();
+            var sqlScript = sut.generate_insert_scripts_run_script("someName", "someSql'f", "someHash", A.Dummy<bool>(), 1);
+            StringAssert.IsMatch("INSERT INTO.*ScriptsRun.*someName.*someSql''f.*someHash", sqlScript);
+        }
+
         // test factories
         private TestableDatabase MakeTestableSut()
         {
-            var sut = new TestableDatabase();
-            sut.roundhouse_schema_name = "SomeSchema";
-            sut.database_name = "SomeDb";
+            var sut = new TestableDatabase
+            {
+                roundhouse_schema_name = "SomeSchema",
+                database_name          = "SomeDb",
+                repository             = A.Fake<IRepository>()
+            };
             return sut;
         }
-
-
     }
-
-
-
-
 }

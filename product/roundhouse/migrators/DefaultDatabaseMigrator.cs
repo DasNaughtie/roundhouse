@@ -9,12 +9,17 @@ namespace roundhouse.migrators
     using infrastructure.app.tokens;
     using infrastructure.extensions;
     using infrastructure.logging;
+
+    using roundhouse.infrastructure;
+
     using sqlsplitters;
     using Environment = roundhouse.environments.Environment;
 
     public class DefaultDatabaseMigrator : DatabaseMigrator
     {
         public Database database { get; set; }
+
+        public event CreateScriptHandler create_script_handler;
 
         public bool is_running_a_dry_run { get; set; }
 
@@ -253,18 +258,28 @@ namespace roundhouse.migrators
             return delete_script;
         }
 
-        public long version_the_database(string repository_path, string repository_version) {
+        public long version_the_database(string repository_path, string repository_version)
+        {
+            long versionId;
+
             if (configuration.DryRun)
             {
                 log_info_event_on_bound_logger(" -> Would version {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
-                // TODO (PMO): Make it return a realistic version number
-                return 0;
+                versionId = database.get_version_id_from_database();
             }
             else
             {
                 log_info_event_on_bound_logger(" -> Versioning {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
-                return database.insert_version_and_get_version_id(repository_path, repository_version);
+                versionId = database.insert_version_and_get_version_id(repository_path, repository_version);
             }
+
+            if (create_script_handler != null)
+            {
+                var sql = database.generate_insert_version_and_get_version_id_script( repository_path, repository_version);
+                create_script_handler(this, new CreateScriptEventArgs("VersionTheDatabase", sql, false));
+            }
+
+            return versionId;
         }
 
         public bool run_sql(string sql_to_run, string script_name, bool run_this_script_once, bool run_this_script_every_time, long version_id, Environment environment, string repository_version, string repository_path, ConnectionType connection_type)
@@ -309,7 +324,7 @@ namespace roundhouse.migrators
                     database.server_name,
                     database.database_name);
 
-                record_script_in_scripts_run_table_is_dry_run_safe(script_name, sql_to_run, run_this_script_once, version_id);
+                record_script_in_scripts_run_table(script_name, sql_to_run, run_this_script_once, version_id);
             }
             else
             {
@@ -329,7 +344,7 @@ namespace roundhouse.migrators
                         connection_type,
                         sql_statement);
                 }
-                record_script_in_scripts_run_table_is_dry_run_safe(script_name, sql_to_run, run_this_script_once, version_id);
+                record_script_in_scripts_run_table(script_name, sql_to_run, run_this_script_once, version_id);
             }
         }
 
@@ -354,7 +369,7 @@ namespace roundhouse.migrators
                         sql_statement);
                 database.rollback();
 
-                record_script_in_scripts_run_errors_table_is_dry_run_safe(
+                record_script_in_scripts_run_errors_table(
                     script_name,
                     sql_to_run,
                     sql_statement,
@@ -397,7 +412,7 @@ namespace roundhouse.migrators
                 string.Format(
                     "{0} has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set warnOnOneTimeScriptChanges to true and run again. Stopping execution.",
                     script_name);
-            record_script_in_scripts_run_errors_table_is_dry_run_safe(
+            record_script_in_scripts_run_errors_table(
                 script_name,
                 sql_to_run,
                 sql_to_run,
@@ -427,7 +442,7 @@ namespace roundhouse.migrators
             return sql_statements;
         }
 
-        public void record_script_in_scripts_run_table_is_dry_run_safe(string script_name, string sql_to_run, bool run_this_script_once, long version_id)
+        public void record_script_in_scripts_run_table(string script_name, string sql_to_run, bool run_this_script_once, long version_id)
         {
             if (configuration.DryRun)
             {
@@ -438,9 +453,16 @@ namespace roundhouse.migrators
                 log_debug_event_on_bound_logger(" -> Recording {0} script ran on {1} - {2}.", script_name, database.server_name, database.database_name);
                 database.insert_script_run(script_name, sql_to_run, create_hash(sql_to_run), run_this_script_once, version_id);
             }
+
+            // create the script file in the migrations folder for inserting new row in scripts run
+            if (create_script_handler != null)
+            {
+                var sql = database.generate_insert_scripts_run_script(script_name, sql_to_run, create_hash(sql_to_run), run_this_script_once, version_id);
+                create_script_handler(this, new CreateScriptEventArgs("RecordScriptRun-" + script_name, sql, false));
+            }
         }
 
-        public void record_script_in_scripts_run_errors_table_is_dry_run_safe(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
+        public void record_script_in_scripts_run_errors_table(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
         {
             if (configuration.DryRun)
             {
