@@ -5,9 +5,12 @@ namespace roundhouse.migrators
 {
     using environments;
 
+    using roundhouse.infrastructure;
+
     public interface DatabaseMigrator
     {
         Database database { get; set; }
+        event CreateScriptHandler create_script_handler;
         bool is_running_a_dry_run { get; set; }
         void initialize_connections();
         void open_admin_connection();

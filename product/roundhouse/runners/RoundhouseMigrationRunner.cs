@@ -35,7 +35,9 @@ namespace roundhouse.runners
 
         private const int LINE_WIDTH = 72;
 
-        private static int simple_output_file_number = 100;
+        private static int simple_output_file_number_before_up = 100;
+        private static int simple_output_file_number_normal = 200;
+        private static int simple_output_file_number_after_up = 800;
 
         public RoundhouseMigrationRunner(
             string repository_path,
@@ -62,6 +64,12 @@ namespace roundhouse.runners
             this.dont_create_the_database = dont_create_the_database;
             this.run_in_a_transaction = run_in_a_transaction;
             this.configuration = configuration;
+            database_migrator.create_script_handler += database_create_script_handler;
+        }
+
+        void database_create_script_handler(object sender, CreateScriptEventArgs e)
+        {
+            put_script_in_change_drop_for_database_command(e.FileName, e.SqlScript, e.BeforeUpScript);
         }
 
         public void run()
@@ -391,16 +399,9 @@ namespace roundhouse.runners
             copy_to_change_drop_folder(
                 tempFileName,
                 fileName + ".sql",
-                beforeUpScript ? known_folders.run_before_up : known_folders.run_after_other_any_time_scripts);
-        }
-
-        private string create_temporary_file(string fileName)
-        {
-            var newScriptPath = file_system.combine_paths(file_system.get_temp_folder(), fileName + ".sql");
-            // in case it was already there
-            File.Delete(newScriptPath);
-            File.Create(newScriptPath);
-            return newScriptPath;
+                beforeUpScript ? known_folders.run_before_up : known_folders.run_after_other_any_time_scripts, 
+                beforeUpScript ? ExecutionPhase.Before : ExecutionPhase.After
+                );
         }
 
         protected virtual void drop_the_database()
@@ -577,7 +578,7 @@ namespace roundhouse.runners
         {
             try
             {
-                copy_to_change_drop_folder(sql_file, null, migration_folder);
+                copy_to_change_drop_folder(sql_file, null, migration_folder, ExecutionPhase.During);
             }
             catch (Exception ex)
             {
@@ -605,19 +606,19 @@ namespace roundhouse.runners
             return TokenReplacer.replace_tokens(configuration, sql_text);
         }
 
-        protected virtual void copy_to_change_drop_folder(string path_to_sql_file, string new_script_name, Folder migration_folder)
+        protected virtual void copy_to_change_drop_folder(string path_to_sql_file, string new_script_name, Folder migration_folder, ExecutionPhase executionPhase)
         {
             if (!configuration.DisableOutput)
             {
                 string destination_file_path;
                 if (configuration.SimpleOutput)
                 {
+                    var file_number = get_file_number_and_increment_relevant_counter(executionPhase);
                     var destination_file_name = get_destination_file_name(path_to_sql_file, new_script_name, true);
                     destination_file_path = file_system.combine_paths(
                         known_folders.change_drop.folder_full_path,
                         "scripts",
-                        String.Format("{0}_{1}", simple_output_file_number, destination_file_name));
-                    simple_output_file_number++;
+                        String.Format("{0}_{1}", file_number, destination_file_name));
                 }
                 else
                 {
@@ -632,6 +633,35 @@ namespace roundhouse.runners
                 log_debug_event_on_bound_logger("Copying file {0} to {1}.", file_system.get_file_name_from(path_to_sql_file), destination_file_path);
                 file_copy_unsafe(path_to_sql_file, destination_file_path);
             }
+        }
+
+        protected enum ExecutionPhase
+        {
+            Before,
+            During,
+            After
+        }
+
+        private int get_file_number_and_increment_relevant_counter(ExecutionPhase phase)
+        {
+            var retVal = 0;
+            switch (phase)
+            {
+                case ExecutionPhase.Before:
+                    retVal = simple_output_file_number_before_up++;
+                    break;
+                case ExecutionPhase.During:
+                    retVal = simple_output_file_number_normal++;
+                    break;
+                case ExecutionPhase.After:
+                    retVal = simple_output_file_number_after_up;
+                    break;
+                default:
+                    retVal = simple_output_file_number_normal++;
+                    break;
+            }
+
+            return retVal;
         }
 
         private string get_destination_file_name(string path_to_sql_file, string new_script_name, bool strip_out_folder_names)

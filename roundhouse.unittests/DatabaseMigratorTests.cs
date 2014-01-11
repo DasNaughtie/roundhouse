@@ -262,10 +262,45 @@ namespace roundhouse.nunittests
         }
 
         [Test]
+        public void InsertIntoScriptsRun_WithCreateScriptHandlerDelegateDefined_CallsIt()
+        {
+            var sut = MakeTestableSut(false);
+            var wasCalled = false;
+            sut.create_script_handler += (sender, args) =>
+            {
+                StringAssert.Contains("RecordScriptRun-someName", args.FileName);
+                Assert.AreNotEqual("someSql", args.SqlScript);
+                Assert.AreEqual(false, args.BeforeUpScript);
+                wasCalled = true;
+            };
+            sut.record_script_in_scripts_run_table("someName", "someSql", A.Dummy<bool>(), 1);
+            Assert.AreEqual(true, wasCalled);
+        }
+
+        [Test]
+        public void VersionTheDatabase_WithCreateScriptHandlerDelegateDefined_CallsIt()
+        {
+            var sut = MakeTestableSut(true);
+            var wasCalled = false;
+            sut.create_script_handler += (sender, args) =>
+            {
+                StringAssert.Contains("VersionTheDatabase", args.FileName);
+                StringAssert.Contains("someSql", args.SqlScript);
+                Assert.AreEqual(false, args.BeforeUpScript);
+                wasCalled = true;
+            };
+            A.CallTo(() => sut.database.generate_insert_version_and_get_version_id_script(A.Dummy<String>(), A.Dummy<String>()))
+                .WithAnyArguments()
+                .Returns("someSql");
+            sut.version_the_database("SomePath", "SomeVersion");
+            Assert.AreEqual(true, wasCalled);
+        }
+
+        [Test]
         public void RecordScript_WithoutDryRun_RecordsAndLogs()
         {
             var sut = MakeTestableSut(false);
-            sut.record_script_in_scripts_run_table_is_dry_run_safe("SomeName", "SomeSQL", true, 0);
+            sut.record_script_in_scripts_run_table("SomeName", "SomeSQL", true, 0);
             StringAssert.Contains(" -> Recording SomeName script ran on ServerName - DbName.", sut.checkDebugLog.ToString());
             A.CallTo(() => sut.database.insert_script_run(A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), A.Dummy<bool>(), A.Dummy<long>())).WithAnyArguments().MustHaveHappened();
         }
@@ -275,7 +310,7 @@ namespace roundhouse.nunittests
         public void RecordScript_WithDryRun_DoesNotRecordsAndLogs()
         {
             var sut = MakeTestableSut(true);
-            sut.record_script_in_scripts_run_table_is_dry_run_safe("SomeName", "SomeSQL", true, 0);
+            sut.record_script_in_scripts_run_table("SomeName", "SomeSQL", true, 0);
             StringAssert.Contains(" -> Would record SomeName script ran on ServerName - DbName in the ScriptsRunTable table.", sut.checkInfoLog.ToString());
             A.CallTo(() => sut.database.insert_script_run(A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), A.Dummy<bool>(), A.Dummy<long>())).WithAnyArguments().MustNotHaveHappened();
         }
@@ -284,12 +319,12 @@ namespace roundhouse.nunittests
         public void RecordScriptInErrorsRun_WithoutDryRun_RecordsAndLogs()
         {
             var sut = MakeTestableSut(false);
-            sut.record_script_in_scripts_run_errors_table_is_dry_run_safe("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");
+            sut.record_script_in_scripts_run_errors_table("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");
             StringAssert.Contains("Recording SomeName script ran with error on ServerName - DbName.", sut.checkDebugLog.ToString());
             A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(), 
                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), 
                 A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
-        }        [Test]        public void RecordScriptInErrorsRun_WithDryRun_DoesNotRecordAndLogs()        {            var sut = MakeTestableSut(true);            sut.record_script_in_scripts_run_errors_table_is_dry_run_safe("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");            StringAssert.Contains(" -> Would have recorded SomeName script ran with error on ServerName - DbName in the ScriptsRunErrorsTable table.",                 sut.checkInfoLog.ToString());            A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();        }
+        }        [Test]        public void RecordScriptInErrorsRun_WithDryRun_DoesNotRecordAndLogs()        {            var sut = MakeTestableSut(true);            sut.record_script_in_scripts_run_errors_table("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");            StringAssert.Contains(" -> Would have recorded SomeName script ran with error on ServerName - DbName in the ScriptsRunErrorsTable table.",                 sut.checkInfoLog.ToString());            A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();        }
 
         [Test]
         [TestCase(true)]
