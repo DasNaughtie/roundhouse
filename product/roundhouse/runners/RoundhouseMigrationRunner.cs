@@ -3,6 +3,7 @@ using NHibernate.Cfg;
 namespace roundhouse.runners
 {
     using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
     using System.IO;
 
@@ -15,6 +16,9 @@ namespace roundhouse.runners
     using infrastructure.filesystem;
     using infrastructure.logging;
     using migrators;
+
+    using NHibernate.Mapping;
+
     using resolvers;
     using Environment = environments.Environment;
 
@@ -31,13 +35,22 @@ namespace roundhouse.runners
         public bool dont_create_the_database;
         public bool run_in_a_transaction;
         protected ConfigurationPropertyHolder configuration;
-        protected const string SQL_EXTENSION = "*.sql";
+
+        protected const string SQL_EXTENSION                  = "*.sql";
+        protected const string INDIVIDUAL_SCRIPTS_FOLDER_NAME = "individualScripts";
 
         private const int LINE_WIDTH = 72;
 
+        protected const string LINE_MARKER_DURING_MIGRATION = "-- #### RHMigration: Scripts to be run during migration ################ --";
+        protected const string LINE_MARKER_AFTER_MIGRATION  = "-- #### RHMigration: Scripts to be run after migration ################# --";
+        protected const string COMBINED_SCRIPT_FILE_NAME = "combinedScripts.sql";
+
+        private readonly object LOCK_COMBINED_SCRIPT        = new object();
+        private readonly object LOCK_SQL_FILE               = new object();
+
         private static int simple_output_file_number_before_up = 100;
-        private static int simple_output_file_number_normal = 200;
-        private static int simple_output_file_number_after_up = 800;
+        private static int simple_output_file_number_normal    = 200;
+        private static int simple_output_file_number_after_up  = 800;
 
         public RoundhouseMigrationRunner(
             string repository_path,
@@ -81,7 +94,7 @@ namespace roundhouse.runners
             if (configuration.DryRun)
             {
                 this.log_info_event_on_bound_logger("This is a dry run, nothing will be done to the database.");
-                WaitForKeypress();
+                //WaitForKeypress();
             }
 
             handle_invalid_transaction_argument();
@@ -90,6 +103,11 @@ namespace roundhouse.runners
             try
             {
                 this.log_action_starting();
+
+                if (configuration.SimpleOutput)
+                {
+                    create_default_combined_script_path_file_if_needed(get_combined_script_file_path());
+                }
 
                 create_share_and_set_permissions_for_change_drop_folder();
 
@@ -618,7 +636,9 @@ namespace roundhouse.runners
                     destination_file_path = file_system.combine_paths(
                         known_folders.change_drop.folder_full_path,
                         "scripts",
+                        INDIVIDUAL_SCRIPTS_FOLDER_NAME,
                         String.Format("{0}_{1}", file_number, destination_file_name));
+                    combine_script_into_one_file(path_to_sql_file, executionPhase);
                 }
                 else
                 {
@@ -635,7 +655,93 @@ namespace roundhouse.runners
             }
         }
 
-        protected enum ExecutionPhase
+        protected virtual void combine_script_into_one_file(string path_to_sql_file, ExecutionPhase phase)
+        {
+            var combinedScriptFilePath = get_combined_script_file_path();
+
+            var insertAt = 0;
+            var currentContents = new List<String>();
+            lock (LOCK_COMBINED_SCRIPT)
+            {
+                currentContents = new List<string>(get_lines_from_file(combinedScriptFilePath));
+            }
+
+            if (phase == ExecutionPhase.Before)
+            {
+                for (var i = 0; i < currentContents.Count; i++)
+                {
+                    if (currentContents[i] == LINE_MARKER_DURING_MIGRATION)
+                    {
+                        insertAt = i;
+                        break;
+                    }
+                }
+            }
+            else if (phase == ExecutionPhase.During)
+            {
+                for (var i = 0; i < currentContents.Count; i++)
+                {
+                    if (currentContents[i] == LINE_MARKER_AFTER_MIGRATION)
+                    {
+                        insertAt = i;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                insertAt = currentContents.Count;
+            }
+
+            var contentsOfIndividualScript = new List<string>();
+            lock (LOCK_SQL_FILE)
+            {
+                contentsOfIndividualScript = new List<string>(get_lines_from_file(path_to_sql_file));
+                contentsOfIndividualScript.Insert(0, System.Environment.NewLine + "-- " + path_to_sql_file);
+            }
+
+            currentContents.InsertRange(insertAt, contentsOfIndividualScript);
+            lock (LOCK_COMBINED_SCRIPT)
+            {
+                File.WriteAllLines(combinedScriptFilePath, currentContents.ToArray());  
+            }
+        }
+
+        protected virtual string[] get_lines_from_file(string path_to_file)
+        {
+            return File.ReadAllLines(path_to_file);
+        }
+
+        protected virtual void create_default_combined_script_path_file_if_needed(string combinedScriptFilePath)
+        {
+            lock (LOCK_COMBINED_SCRIPT)
+            {
+                make_sure_folder_is_there(combinedScriptFilePath);
+                // create initial file with tokens in it to make it easy to find insertion points
+                File.WriteAllLines(combinedScriptFilePath, new string[] {System.Environment.NewLine, LINE_MARKER_DURING_MIGRATION, System.Environment.NewLine});
+                File.AppendAllText(combinedScriptFilePath, System.Environment.NewLine + LINE_MARKER_AFTER_MIGRATION + System.Environment.NewLine);
+            }
+        }
+
+        private void make_sure_folder_is_there(string combinedScriptFilePath)
+        {
+            var pathToFile = Path.GetFullPath(combinedScriptFilePath);
+            var folderPath = Path.GetDirectoryName(pathToFile);
+            file_system.verify_or_create_directory(folderPath);
+        }
+
+        public string get_combined_script_file_path()
+        {
+            string path = null;
+            if (configuration.SimpleOutput)
+            {
+                path = file_system.combine_paths(known_folders.change_drop.folder_full_path, "scripts", COMBINED_SCRIPT_FILE_NAME);
+            }
+
+            return path;
+        }
+
+        public enum ExecutionPhase
         {
             Before,
             During,
@@ -654,7 +760,7 @@ namespace roundhouse.runners
                     retVal = simple_output_file_number_normal++;
                     break;
                 case ExecutionPhase.After:
-                    retVal = simple_output_file_number_after_up;
+                    retVal = simple_output_file_number_after_up++;
                     break;
                 default:
                     retVal = simple_output_file_number_normal++;
