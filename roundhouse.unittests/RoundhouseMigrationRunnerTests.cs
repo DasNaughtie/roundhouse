@@ -37,11 +37,12 @@ namespace roundhouse.unittests
         public VersionResolver fakeVersionResolver                 = A.Fake<VersionResolver>();
 
         // Quick stub checks
-        public bool CheckChangeDropFolderCreated = false;
-        public StringBuilder CheckLogWritten     = new StringBuilder();
-        public StringBuilder CheckDebugLog       = new StringBuilder();
-        public StringBuilder CheckWarningWritten = new StringBuilder();
-        public StringBuilder CheckFilesCopied    = new StringBuilder();
+        public bool CheckChangeDropFolderCreated       = false;
+        public StringBuilder CheckLogWritten           = new StringBuilder();
+        public StringBuilder CheckDebugLog             = new StringBuilder();
+        public StringBuilder CheckWarningWritten       = new StringBuilder();
+        public StringBuilder CheckFilesCopied          = new StringBuilder();
+        public string CheckCombinedScriptFileCreatedAt = null;
 
         public TestableRoundhouseMigrationRunner()
             : base(A.Dummy<String>(),
@@ -135,9 +136,32 @@ namespace roundhouse.unittests
             CheckFilesCopied.AppendFormat("{0} -> {1}{2}", sql_file_ran, destination_file, System.Environment.NewLine);
         }
 
+        protected override void create_default_combined_script_path_file_if_needed(string combinedScriptFilePath)
+        {
+            CheckCombinedScriptFileCreatedAt = combinedScriptFilePath;
+            base.create_default_combined_script_path_file_if_needed(combinedScriptFilePath);
+        }
+
+        protected override string[] get_lines_from_file(string path)
+        {
+            if (path.EndsWith(COMBINED_SCRIPT_FILE_NAME))
+            {
+                return new string[] { LINE_MARKER_DURING_MIGRATION, "Line from " + path, LINE_MARKER_AFTER_MIGRATION };
+            }
+            else
+            {
+                return new string[] { "Line from " + path };
+            }
+        }
+
         public void CopyToChangeDropFolder(string sql_file_ran, Folder migration_folder)
         {
             base.copy_to_change_drop_folder(sql_file_ran, null, migration_folder, ExecutionPhase.During);
+        }
+
+        public void CopyToChangeDropFolder(string sql_file_ran, string new_script_name, Folder migration_folder, ExecutionPhase phase)
+        {
+           base.copy_to_change_drop_folder(sql_file_ran, new_script_name, migration_folder, phase); 
         }
     }
 
@@ -288,6 +312,43 @@ namespace roundhouse.unittests
             sut.run();
             StringAssert.Contains(expected, sut.CheckLogWritten.ToString());
             A.CallTo(() => sut.database_migrator.set_recovery_mode(recoveryMode == RecoveryMode.Simple)).MustHaveHappened();
+        }
+
+        [Test]
+        public void Run_WithSimpleOutput_ClearsOutCombinedScriptFile()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(A.Dummy<bool>(), true);
+            sut.run();
+            StringAssert.Contains("combinedScripts.sql", sut.CheckCombinedScriptFileCreatedAt);
+        }
+
+        //[Test] // this is an integration test, taking out for now...
+        public void CopyToChangeDropFolder_WithSimpleOutput_CreatesAllSqlFileInAdditionToIndividualScripts()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(true, true);
+            var temp1 = Path.GetTempFileName();
+            var temp2 = Path.GetTempFileName();
+            var temp3 = Path.GetTempFileName();
+            File.WriteAllText(temp1, "Text for temp1 -- after");
+            var folder1 = MakeMigrationsFolder("After", false, true);
+
+            File.WriteAllText(temp2, "Text for temp2 -- during");
+            var folder2 = MakeMigrationsFolder("During", false, false);
+
+            File.WriteAllText(temp3, "Text for temp3 -- before");
+            var folder3 = MakeMigrationsFolder("Before", true, false);
+
+            sut.CopyToChangeDropFolder(temp1, "Temp1After", folder1, RoundhouseMigrationRunner.ExecutionPhase.After);
+            sut.CopyToChangeDropFolder(temp2, "Temp2During", folder2, RoundhouseMigrationRunner.ExecutionPhase.During);
+            sut.CopyToChangeDropFolder(temp3, "Temp3During", folder3, RoundhouseMigrationRunner.ExecutionPhase.Before);
+
+            var combinedScriptPath = sut.get_combined_script_file_path();
+
+            var contents = File.ReadAllLines(combinedScriptPath);
+
+            StringAssert.Contains("Text for temp3 -- before", contents[0]);
+            StringAssert.Contains("Text for temp2 -- during", contents[2]);
+            StringAssert.Contains("Text for temp1 -- after", contents[4]);
         }
 
         [Test]
@@ -462,7 +523,6 @@ namespace roundhouse.unittests
             StringAssert.Contains("-> " + FOLDER_PATH + "\\change_drop\\itemsRan\\folderName\\folder3\\file3.sql", sut.CheckFilesCopied.ToString());
         }
 
-
         [Test]
         public void CopyToChangeDropFolder_WithSimpleOutput_PutsOutputInChangeDropFolderWithNumbers()
         {
@@ -471,9 +531,9 @@ namespace roundhouse.unittests
             sut.CopyToChangeDropFolder("folder1\\file1.sql", dropFolder);
             sut.CopyToChangeDropFolder("folder2\\file2.sql", dropFolder);
             sut.CopyToChangeDropFolder("folder3\\file3.sql", dropFolder);
-            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\2\d\d_file1.sql", sut.CheckFilesCopied.ToString());
-            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\2\d\d_file2.sql", sut.CheckFilesCopied.ToString());
-            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\2\d\d_file3.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\individualScripts\\2\d\d_file1.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\individualScripts\\2\d\d_file2.sql", sut.CheckFilesCopied.ToString());
+            StringAssert.IsMatch("-> " + FOLDER_PATH + @"\\change_drop\\scripts\\individualScripts\\2\d\d_file3.sql", sut.CheckFilesCopied.ToString());
         }
         
         private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun, bool simpleOutput)
