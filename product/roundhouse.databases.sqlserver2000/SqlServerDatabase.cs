@@ -99,6 +99,18 @@ namespace roundhouse.databases.sqlserver2000
             return sql;
         }
 
+        public override bool has_roundhouse_support_tables()
+        {
+            var sql = "IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRun]') AND type in (N'U')) " +
+            "    IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRunErrors]') AND type in (N'U'))" +
+            "        IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[Version]') AND type in (N'U'))" +
+            "            SELECT 1 AS HasRoundhousESupportTables " +
+            "ELSE " +
+            "    SELECT 0 AS HasRoundhousESupportTables";
+            var result = run_sql_scalar(sql, ConnectionType.Default) as int?;
+            return result.HasValue && result == 1;
+        }
+
         public override string create_database_script()
         {
             return string.Format(

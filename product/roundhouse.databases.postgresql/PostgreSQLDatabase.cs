@@ -151,6 +151,11 @@ namespace roundhouse.databases.postgresql
                     ConnectionType.Default);
         }
 
+        public override bool has_roundhouse_support_tables()
+        {
+            throw new NotImplementedException("PostgreSQL Databases don't support this yet. Don't use the dryrun flag against it.");
+        }
+
         public override string generate_database_specific_script()
         {
             return String.Empty;

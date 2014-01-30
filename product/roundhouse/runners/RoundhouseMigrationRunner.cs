@@ -4,6 +4,7 @@ namespace roundhouse.runners
 {
     using System;
     using System.Collections.Generic;
+    using System.Data.SqlClient;
     using System.Diagnostics;
     using System.IO;
 
@@ -110,6 +111,23 @@ namespace roundhouse.runners
                 }
 
                 create_share_and_set_permissions_for_change_drop_folder();
+
+                var hasRoundhouseSupportTables = database_migrator.database.has_roundhouse_support_tables();
+                if (configuration.DryRun && hasRoundhouseSupportTables == false)
+                {
+                    log_warning_event_on_bound_logger("Database {1} on server {2} does not have the RoundhousE support{0}" +
+                        "tables (ScriptsRun, ScriptsRunErrors, Version) created.{0}{0}" +
+                        "You can not run RoundhousE in dry run mode against this database. To fix this: {0}" +
+                        "    (A) -EITHER- Run RoundhousE in regular mode (without the --dryrun switch){0}" +
+                        "    (B) -OR- Run the '{3}' script located in the drop folder manually.{0}{0}",
+                        System.Environment.NewLine,
+                        database_migrator.database.database_name,
+                        database_migrator.database.server_name,
+                        "CreateRoundhouseSupportTables.sql");
+                    var script = database_migrator.database.generate_support_tables_script();
+                    put_script_in_change_drop_for_database_command("CreateRoundhouseSupportTables", script, true);
+                    return;
+                }
 
                 // TODO (PMO): This was commented out, figure out if we can turn it on again?
                 //database_migrator.backup_database_if_it_exists();
@@ -341,7 +359,29 @@ namespace roundhouse.runners
                     );
             }
             database_migrator.run_roundhouse_support_tasks();
-            var script = database_migrator.database.generate_database_specific_script();
+            string script = "";
+            try
+            {
+                script = database_migrator.database.generate_database_specific_script();
+            }
+            catch (SqlException ex)
+            {
+                if (configuration.DryRun)
+                {
+                    log_info_event_on_bound_logger("{0}{0}    Error: Would have run database specific tasks on database {1}{0}" + 
+                        "           but I failed because:{0}" +
+                        "           {2}{0}" +
+                        "           This is probably because you are running RoundHouse in dry run mode against a database{0}" +
+                        "           that hasn't had roundhouse run against it before--so the RoundhousE support tables{0}" +
+                        "           don't exist yet. To fix, run RoundhousE without the --dryrun flag, or just execute the{0}" +
+                        "           SQL below against the database:{0}{0}{3}",
+                        System.Environment.NewLine,
+                        database_migrator.database.database_name,
+                        ex.Message,
+                        database_migrator.database.generate_database_specific_script()
+                        );
+                }
+            }
             put_script_in_change_drop_for_database_command("DatabaseSpecificTasks", script, true);
         }
 
