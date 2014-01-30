@@ -177,6 +177,11 @@ namespace roundhouse.databases
             return database.generate_database_specific_script();
         }
 
+        public string generate_support_tables_script()
+        {
+            return database.generate_support_tables_script();
+        }
+
         public string create_database_script(string custom_create_database_script)
         {
             return string.Empty;
@@ -306,6 +311,11 @@ namespace roundhouse.databases
             }
 
             return false;
+        }
+
+        public bool has_roundhouse_support_tables()
+        {
+            return database.has_roundhouse_support_tables();
         }
 
         public string get_current_script_hash(string script_name)

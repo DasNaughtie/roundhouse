@@ -150,6 +150,11 @@ namespace roundhouse.databases.oracle
             return Convert.ToInt64(run_sql_scalar(get_version_id_script(), ConnectionType.Default, select_parameters));
         }
 
+        public override bool has_roundhouse_support_tables()
+        {
+            throw new NotImplementedException("Oracle Databases don't support this yet. Don't use the dryrun flag against it.");
+        }
+
         public override string run_sql(string sql_to_run, ConnectionType connection_type)
         {
             Log.bound_to(this).log_a_debug_event_containing("Replacing script text \r\n with \n to be compliant with Oracle.");

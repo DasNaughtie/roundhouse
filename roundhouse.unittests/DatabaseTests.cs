@@ -118,6 +118,14 @@ namespace roundhouse.nunittests
             StringAssert.IsMatch("INSERT INTO.*ScriptsRun.*someName.*someSql''f.*someHash", sqlScript);
         }
 
+        [Test]
+        public void GenerateSupportTablesScript_ForSqlServerDatabase_ReturnsSql()
+        {
+            var sut = MakeTestableSut();
+            var sqlScript = sut.generate_support_tables_script();
+            StringAssert.IsMatch(@"CREATE TABLE RoundhousE\.\[Version\]", sqlScript);
+        }
+
         // test factories
         private TestableDatabase MakeTestableSut()
         {

@@ -10,6 +10,8 @@ namespace roundhouse.databases.sqlserver
     using infrastructure.extensions;
     using infrastructure.logging;
 
+    using roundhouse.model;
+
     public class SqlServerDatabase : AdoNetDatabase
     {
         private string connect_options = "Integrated Security";
@@ -95,13 +97,65 @@ namespace roundhouse.databases.sqlserver
 
         public override string generate_database_specific_script()
         {
-            return create_roundhouse_schema_if_it_doesnt_exist();
+            return create_roundhouse_schema_script();
+        }
+
+        public override string generate_support_tables_script()
+        {
+            var sql = "IF  NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[Version]') AND type in (N'U')) \n" +
+                "BEGIN \n" +
+                "    CREATE TABLE RoundhousE.[Version] \n" +
+                "    (id BIGINT IDENTITY NOT NULL \n" +
+                "    ,repository_path NVARCHAR(255) NULL \n" +
+                "    ,version NVARCHAR(50) NULL \n" +
+                "    ,entry_date DATETIME NULL \n" +
+                "    ,modified_date DATETIME NULL \n" +
+                "    ,entered_by NVARCHAR(50) NULL \n" +
+                "    ,PRIMARY KEY (id) \n" +
+                "    ) \n" +
+                "END \n" +
+                " \n" +
+                " \n" +
+                "IF  NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRun]') AND type in (N'U')) \n" +
+                "BEGIN \n" +
+                "    CREATE TABLE RoundhousE.[ScriptsRun] \n" +
+                "    (id BIGINT IDENTITY NOT NULL \n" +
+                "    ,version_id BIGINT NULL \n" +
+                "    ,script_name NVARCHAR(255) NULL \n" +
+                "    ,text_of_script TEXT NULL \n" +
+                "    ,text_hash NVARCHAR(512) NULL \n" +
+                "    ,one_time_script BIT NULL \n" +
+                "    ,entry_date DATETIME NULL \n" +
+                "    ,modified_date DATETIME NULL \n" +
+                "    ,entered_by NVARCHAR(50) NULL \n" +
+                "    ,PRIMARY KEY (id) \n" +
+                "    ) \n" +
+                "END \n" +
+                " \n" +
+                " \n" +
+                "IF  NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRunErrors]') AND type in (N'U')) \n" +
+                "BEGIN \n" +
+                "    CREATE TABLE RoundhousE.[ScriptsRunErrors] \n" +
+                "    (id BIGINT IDENTITY NOT NULL \n" +
+                "    ,repository_path NVARCHAR(255) NULL \n" +
+                "    ,version NVARCHAR(50) NULL \n" +
+                "    ,script_name NVARCHAR(255) NULL \n" +
+                "    ,text_of_script NTEXT NULL \n" +
+                "    ,erroneous_part_of_script NTEXT NULL \n" +
+                "    ,error_message NTEXT NULL \n" +
+                "    ,entry_date DATETIME NULL \n" +
+                "    ,modified_date DATETIME NULL \n" +
+                "    ,entered_by NVARCHAR(50) NULL \n" +
+                "    ,PRIMARY KEY (id) \n" +
+                "    ) \n" +
+                "END \n";
+            return sql;
         }
 
         public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_an_info_event_containing(" -> Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
-            var sql = generate_database_specific_script();
+            var sql = create_roundhouse_schema_if_it_doesnt_exist();
             Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: This should remove a user named RoundhousE if one exists (migration from SQL2000 up)");
             //TODO: Delete RoundhousE user if it exists (i.e. migration from SQL2000 to 2005)
             return sql;
@@ -146,6 +200,18 @@ namespace roundhouse.databases.sqlserver
             );
 
             return sql;
+        }
+
+        public override bool has_roundhouse_support_tables()
+        {
+            var sql = "IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRun]') AND type in (N'U')) " +
+            "    IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRunErrors]') AND type in (N'U'))" +
+            "        IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[Version]') AND type in (N'U'))" +
+            "            SELECT 1 AS HasRoundhousESupportTables " +
+            "ELSE " +
+            "    SELECT 0 AS HasRoundhousESupportTables";
+            var result = run_sql_scalar(sql, ConnectionType.Default) as int?;
+            return result.HasValue && result == 1;
         }
 
         public string create_roundhouse_schema_if_it_doesnt_exist()

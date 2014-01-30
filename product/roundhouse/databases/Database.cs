@@ -102,6 +102,8 @@ namespace roundhouse.databases
 
         string generate_database_specific_script();
 
+        string generate_support_tables_script();
+
         bool create_database_if_it_doesnt_exist(string custom_create_database_script);
         void set_recovery_mode(bool simple);
         string generate_recovery_mode_script();
@@ -124,6 +126,8 @@ namespace roundhouse.databases
         long insert_version_and_get_version_id(string repository_path, string repository_version);
         string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version);
         bool has_run_script_already(string script_name);
+
+        bool has_roundhouse_support_tables();
         string get_current_script_hash(string script_name);
         //object run_sql_scalar(string sql_to_run);
     }

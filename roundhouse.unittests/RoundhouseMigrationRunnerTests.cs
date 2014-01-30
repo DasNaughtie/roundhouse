@@ -1,6 +1,5 @@
 ﻿using roundhouse.databases;
 using roundhouse.databases.access;
-using roundhouse.databases.sqlserver2000;
 
 namespace roundhouse.unittests
 {
@@ -13,6 +12,7 @@ namespace roundhouse.unittests
     using FakeItEasy;
     using NUnit.Framework;
     using roundhouse.consoles;
+    using roundhouse.databases.sqlserver;
     using roundhouse.environments;
     using roundhouse.folders;
     using roundhouse.infrastructure.app;
@@ -362,19 +362,22 @@ namespace roundhouse.unittests
             string expected, 
             string notExpected)
         {
-            // TODO (PMO): Clean this up so it doesn't rely on stringAsserts, but rather A.CallTo(...
-            var sut = new TestableRoundhouseMigrationRunner();
-            sut.fakeConfiguration.DryRun = true;
+            var sut = MakeTestableRoundhouseMigrationRunner(true, false);
             sut.run_in_a_transaction = runInTransaction;
             if (supportsTransaction)
             {
-                sut.database_migrator.database = new SqlServerDatabase();
+                var fakeDb = A.Fake<SqlServerDatabase>();
+                sut.database_migrator.database = fakeDb; //new SqlServerDatabase();
+                A.CallTo(() => fakeDb.has_roundhouse_support_tables()).WithAnyArguments().Returns(true);
+                A.CallTo(() => fakeDb.supports_ddl_transactions).Returns(true);
             }
             else
             {
-                sut.database_migrator.database = new AccessDatabase();
+                var fakeDb = A.Fake<SqlServerDatabase>();
+                sut.database_migrator.database = fakeDb; // new AccessDatabase();
+                A.CallTo(() => fakeDb.has_roundhouse_support_tables()).WithAnyArguments().Returns(true); 
             }
-            sut.fakeDbMigrator.database.database_name = "DbName";
+            sut.database_migrator.database.database_name = "DbName";
             sut.run();
             if (string.IsNullOrEmpty(expected) == false)
             {
@@ -400,11 +403,16 @@ namespace roundhouse.unittests
             sut.run_in_a_transaction = runInTransaction;
             if (supportsTransaction)
             {
-                sut.database_migrator.database = new SqlServerDatabase();
+                var fakeDb = A.Fake<SqlServerDatabase>();
+                sut.database_migrator.database = fakeDb; //new SqlServerDatabase();
+                A.CallTo(() => fakeDb.has_roundhouse_support_tables()).WithAnyArguments().Returns(true);
+                A.CallTo(() => fakeDb.supports_ddl_transactions).Returns(true);
             }
             else
             {
-                sut.database_migrator.database = new AccessDatabase();
+                var fakeDb = A.Fake<SqlServerDatabase>();
+                sut.database_migrator.database = fakeDb; // new AccessDatabase();
+                A.CallTo(() => fakeDb.has_roundhouse_support_tables()).WithAnyArguments().Returns(true);
             }
             sut.run();
             StringAssert.DoesNotContain(notExpected, sut.CheckLogWritten.ToString());
@@ -416,7 +424,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(true, true);
             sut.run();
             StringAssert.Contains("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
-            A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.run_roundhouse_support_tasks()).MustHaveHappened();
             StringAssert.IsMatch(@"1\d\d_DatabaseSpecificTasks.sql", sut.CheckFilesCopied.ToString());
         }
 
@@ -426,7 +434,7 @@ namespace roundhouse.unittests
             var sut = MakeTestableRoundhouseMigrationRunner(false, true);
             sut.run();
             StringAssert.DoesNotContain("Would have run roundhouse support tasks on database DbName", sut.CheckLogWritten.ToString());
-            A.CallTo(() => sut.fakeDbMigrator.run_roundhouse_support_tasks()).MustHaveHappened();
+            A.CallTo(() => sut.database_migrator.run_roundhouse_support_tasks()).MustHaveHappened();
             StringAssert.IsMatch(@"1\d\d_DatabaseSpecificTasks.sql", sut.CheckFilesCopied.ToString());
         }
 
@@ -511,6 +519,16 @@ namespace roundhouse.unittests
         }
 
         [Test]
+        public void Run_WithDryRunAgainstNonRoundhousEDatabase_GivesUsefulErrorMessageAndAScriptToRun()
+        {
+            var sut = MakeTestableRoundhouseMigrationRunner(true, true);
+            A.CallTo(() => sut.database_migrator.database.has_roundhouse_support_tables()).WithAnyArguments().Returns(false);
+            sut.run();
+            StringAssert.Contains("Database DbName on server ServerName does not have the RoundhousE support", sut.CheckWarningWritten.ToString());
+            StringAssert.Contains("tables (ScriptsRun, ScriptsRunErrors, Version) created.", sut.CheckWarningWritten.ToString());
+        }
+
+        [Test]
         public void CopyToChangeDropFolder_WithoutSimpleOutput_PutsOutputInMigrationFoldersWithoutNumbers()
         {
             var sut        = MakeTestableRoundhouseMigrationRunner(false, false);
@@ -538,17 +556,18 @@ namespace roundhouse.unittests
         
         private TestableRoundhouseMigrationRunner MakeTestableRoundhouseMigrationRunner(bool dryRun, bool simpleOutput)
         {
-            var sut                                   = new TestableRoundhouseMigrationRunner();
-            sut.fakeConfiguration.DryRun              = dryRun;
-            sut.fakeConfiguration.SimpleOutput        = simpleOutput;
-            sut.fakeDbMigrator.database.database_name = "DbName";
-            sut.dropping_the_database                 = false;
-            A.CallTo(()                               => sut.fakeKnownFolders.change_drop)
-                .Returns(MakeMigrationsFolder("change_drop", true, false));
+            var sut                                      = new TestableRoundhouseMigrationRunner();
+            sut.fakeConfiguration.DryRun                 = dryRun;
+            sut.fakeConfiguration.SimpleOutput           = simpleOutput;
+            sut.database_migrator.database.database_name = "DbName";
+            sut.database_migrator.database.server_name   = "ServerName";
+            sut.dropping_the_database                    = false;
+            A.CallTo(() => sut.fakeKnownFolders.change_drop).Returns(MakeMigrationsFolder("change_drop", true, false));
             A.CallTo(() => sut.fakeKnownFolders.alter_database).Returns(MakeMigrationsFolder("alter", false, true));
             A.CallTo(() => sut.fakeKnownFolders.functions).Returns(MakeMigrationsFolder("functions", true, false));
             A.CallTo(() => sut.fakeVersionResolver.resolve_version()).Returns(NEW_DB_VERSION);
-            A.CallTo(() => sut.fakeDbMigrator.get_current_version("")).WithAnyArguments().Returns("1");
+            A.CallTo(() => sut.database_migrator.get_current_version("")).WithAnyArguments().Returns("1");
+            A.CallTo(() => sut.database_migrator.database.has_roundhouse_support_tables()).WithAnyArguments().Returns(true);
             return sut;
         }
 

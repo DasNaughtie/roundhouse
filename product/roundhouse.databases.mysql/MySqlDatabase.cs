@@ -130,6 +130,11 @@ namespace roundhouse.databases.mysql
             return sql_to_run;
         }
 
+        public override bool has_roundhouse_support_tables()
+        {
+            throw new NotImplementedException("MySql Databases don't support this yet. Don't use the dryrun flag against it.");
+        }
+
         public override string set_recovery_mode_script(bool simple)
         {
             return string.Empty;

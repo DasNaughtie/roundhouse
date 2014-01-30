@@ -94,6 +94,11 @@ namespace roundhouse.databases
             return string.Empty;
         }
 
+        public virtual string generate_support_tables_script()
+        {
+            return string.Empty;
+        }
+
         public virtual bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
             bool database_was_created = false;
@@ -326,8 +331,9 @@ namespace roundhouse.databases
                     Log.bound_to(this).log_an_info_event_containing("           is probably because you haven't run RoundhousE on this database");
                     Log.bound_to(this).log_an_info_event_containing("           before. DryRun doesn't work unless you've created the RoundhousE");
                     Log.bound_to(this).log_an_info_event_containing("           support tables. You can create them by running RoundhousE against");
-                    Log.bound_to(this).log_an_info_event_containing("           the database WITHOUT the dryrun switch.");
-                    Log.bound_to(this).log_an_info_event_containing("{0}{0}", System.Environment.NewLine);
+                    Log.bound_to(this).log_an_info_event_containing("           the database WITHOUT the dryrun switch.{0}{0}");
+                    Log.bound_to(this).log_an_info_event_containing("           Alternatively, you can run try running the scripts here:");
+                    Log.bound_to(this).log_an_info_event_containing("           {0}{0}{1}", Environment.NewLine, generate_support_tables_script() );
                     
                     Log.bound_to(this).log_an_info_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
                         GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
@@ -382,6 +388,8 @@ namespace roundhouse.databases
         {
             return string.Empty;
         }
+
+        public abstract bool has_roundhouse_support_tables();
 
         public string get_current_script_hash(string script_name)
         {

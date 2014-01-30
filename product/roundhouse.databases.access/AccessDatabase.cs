@@ -108,6 +108,13 @@ namespace roundhouse.databases.access
             return string.Empty;
         }
 
+        public override bool has_roundhouse_support_tables()
+        {
+            //throw new NotImplementedException("Access Databases don't support this yet. Don't use the dryrun flag against it.");
+            // TODO: Implement this sometime
+            return true;
+        }
+
         public override string create_database_script()
         {
             return string.Empty;
