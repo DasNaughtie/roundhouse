@@ -23,10 +23,13 @@ namespace roundhouse.tests.infrastructure.containers
         {
             protected static object result;
             protected static DefaultEnvironment environment;
+            protected static ConfigurationPropertyHolder configuration;
 
-            context c = () => {
-                            environment = new DefaultEnvironment(new DefaultConfiguration {EnvironmentName = "TEST"});
-                        };
+            context c = () =>
+            {
+                configuration = new DefaultConfiguration { EnvironmentName = "TEST" };
+                environment = new DefaultEnvironment(configuration);
+            };
         }
         
         [Concern(typeof(DefaultDatabaseMigrator))]
@@ -95,7 +98,5 @@ namespace roundhouse.tests.infrastructure.containers
             }
             
         }
-
-     
     }
 }

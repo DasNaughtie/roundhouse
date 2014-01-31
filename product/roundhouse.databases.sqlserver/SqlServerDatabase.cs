@@ -10,6 +10,8 @@ namespace roundhouse.databases.sqlserver
     using infrastructure.extensions;
     using infrastructure.logging;
 
+    using roundhouse.model;
+
     public class SqlServerDatabase : AdoNetDatabase
     {
         private string connect_options = "Integrated Security";
@@ -93,20 +95,130 @@ namespace roundhouse.databases.sqlserver
             ((SqlConnection)connection).InfoMessage += (sender, e) => Log.bound_to(this).log_a_debug_event_containing("  [SQL PRINT]: {0}{1}", Environment.NewLine, e.Message);
         }
 
-        public override void run_database_specific_tasks()
+        public override string generate_database_specific_script()
         {
-            Log.bound_to(this).log_an_info_event_containing(" Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
-            create_roundhouse_schema_if_it_doesnt_exist();
-
-            Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: This should remove a user named RoundhousE if one exists (migration from SQL2000 up)");
-            //TODO: Delete RoundhousE user if it exists (i.e. migration from SQL2000 to 2005)
+            return create_roundhouse_schema_script();
         }
 
-        public void create_roundhouse_schema_if_it_doesnt_exist()
+        public override string generate_support_tables_script()
+        {
+            var sql = "IF  NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[Version]') AND type in (N'U')) \n" +
+                "BEGIN \n" +
+                "    CREATE TABLE RoundhousE.[Version] \n" +
+                "    (id BIGINT IDENTITY NOT NULL \n" +
+                "    ,repository_path NVARCHAR(255) NULL \n" +
+                "    ,version NVARCHAR(50) NULL \n" +
+                "    ,entry_date DATETIME NULL \n" +
+                "    ,modified_date DATETIME NULL \n" +
+                "    ,entered_by NVARCHAR(50) NULL \n" +
+                "    ,PRIMARY KEY (id) \n" +
+                "    ) \n" +
+                "END \n" +
+                " \n" +
+                " \n" +
+                "IF  NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRun]') AND type in (N'U')) \n" +
+                "BEGIN \n" +
+                "    CREATE TABLE RoundhousE.[ScriptsRun] \n" +
+                "    (id BIGINT IDENTITY NOT NULL \n" +
+                "    ,version_id BIGINT NULL \n" +
+                "    ,script_name NVARCHAR(255) NULL \n" +
+                "    ,text_of_script TEXT NULL \n" +
+                "    ,text_hash NVARCHAR(512) NULL \n" +
+                "    ,one_time_script BIT NULL \n" +
+                "    ,entry_date DATETIME NULL \n" +
+                "    ,modified_date DATETIME NULL \n" +
+                "    ,entered_by NVARCHAR(50) NULL \n" +
+                "    ,PRIMARY KEY (id) \n" +
+                "    ) \n" +
+                "END \n" +
+                " \n" +
+                " \n" +
+                "IF  NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRunErrors]') AND type in (N'U')) \n" +
+                "BEGIN \n" +
+                "    CREATE TABLE RoundhousE.[ScriptsRunErrors] \n" +
+                "    (id BIGINT IDENTITY NOT NULL \n" +
+                "    ,repository_path NVARCHAR(255) NULL \n" +
+                "    ,version NVARCHAR(50) NULL \n" +
+                "    ,script_name NVARCHAR(255) NULL \n" +
+                "    ,text_of_script NTEXT NULL \n" +
+                "    ,erroneous_part_of_script NTEXT NULL \n" +
+                "    ,error_message NTEXT NULL \n" +
+                "    ,entry_date DATETIME NULL \n" +
+                "    ,modified_date DATETIME NULL \n" +
+                "    ,entered_by NVARCHAR(50) NULL \n" +
+                "    ,PRIMARY KEY (id) \n" +
+                "    ) \n" +
+                "END \n";
+            return sql;
+        }
+
+        public override string run_database_specific_tasks()
+        {
+            Log.bound_to(this).log_an_info_event_containing(" -> Creating {0} schema if it doesn't exist.", roundhouse_schema_name);
+            var sql = create_roundhouse_schema_if_it_doesnt_exist();
+            Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: This should remove a user named RoundhousE if one exists (migration from SQL2000 up)");
+            //TODO: Delete RoundhousE user if it exists (i.e. migration from SQL2000 to 2005)
+            return sql;
+        }
+
+        public override long get_version_id_from_database()
+        {
+            var sql = "SELECT MAX(id) + 1 FROM [RoundhousE].[Version]";
+            long id = 1;
+            var version_from_database = run_sql_scalar(sql, ConnectionType.Default).ToString();
+            long.TryParse(version_from_database, out id);
+            return id;
+        }
+
+        public override string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            var sql = String.Format("exec sp_executesql N'INSERT INTO RoundhousE.ScriptsRun (version_id, script_name, text_of_script, text_hash, one_time_script, entry_date, modified_date, entered_by) VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7); select SCOPE_IDENTITY()',N'@p0 bigint,@p1 nvarchar(4000),@p2 nvarchar(max) ,@p3 nvarchar(4000),@p4 bit,@p5 datetime,@p6 datetime,@p7 nvarchar(4000)',@p0={0},@p1=N'{1}',@p2=N'{2}',@p3=N'{3}',@p4={4},@p5='{5}',@p6='{5}',@p7=N'{6}'",
+                version_id,
+                script_name,
+                sql_to_run.Replace("'", "''"),
+                sql_to_run_hash,
+                run_this_script_once,
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                user_name
+            );
+
+            return sql;
+        }
+
+        public override string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            var sql = String.Format("exec sp_executesql N'INSERT INTO RoundhousE.Version (repository_path, version, entry_date, modified_date, entered_by) VALUES (@p0, @p1, @p2, @p3, @p4); select SCOPE_IDENTITY()',N'@p0 nvarchar(4000),@p1 nvarchar(4000),@p2 datetime,@p3 datetime,@p4 nvarchar(4000)',@p0=N'{0}',@p1=N'{1}',@p2='{2}',@p3='{2}',@p4=N'{3}'",
+                repository_path,
+                repository_version,
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                user_name
+            );
+
+            return sql;
+        }
+
+        public override bool has_roundhouse_support_tables()
+        {
+            var sql = "IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRun]') AND type in (N'U')) " +
+            "    IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRunErrors]') AND type in (N'U'))" +
+            "        IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[Version]') AND type in (N'U'))" +
+            "            SELECT 1 AS HasRoundhousESupportTables " +
+            "ELSE " +
+            "    SELECT 0 AS HasRoundhousESupportTables";
+            var result = run_sql_scalar(sql, ConnectionType.Default) as int?;
+            return result.HasValue && result == 1;
+        }
+
+        public string create_roundhouse_schema_if_it_doesnt_exist()
         {
             try
             {
-                run_sql(create_roundhouse_schema_script(),ConnectionType.Default);
+                return run_sql(create_roundhouse_schema_script(),ConnectionType.Default);
             }
             catch (Exception ex)
             {
@@ -115,6 +227,7 @@ namespace roundhouse.databases.sqlserver
                 //    "Either the schema has already been created OR {0} with provider {1} does not provide a facility for creating roundhouse schema at this time.{2}{3}",
                 //    GetType(), provider, Environment.NewLine, ex.Message);
             }
+            return string.Empty;
         }
 
         public string create_roundhouse_schema_script()

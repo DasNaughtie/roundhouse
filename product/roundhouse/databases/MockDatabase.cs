@@ -5,6 +5,8 @@ namespace roundhouse.databases
     using infrastructure.logging;
     using infrastructure.persistence;
 
+    using roundhouse.infrastructure;
+
     public class MockDatabase : Database
     {
 
@@ -21,6 +23,8 @@ namespace roundhouse.databases
             get { return database.configuration; }
             set { database.configuration = value; }
         }
+
+        public event CreateScriptHandler create_script_handler;
 
         public string connection_string
         {
@@ -158,6 +162,31 @@ namespace roundhouse.databases
             database.rollback();
         }
 
+        public string create_database_script()
+        {
+            return string.Empty;
+        }
+
+        public string generate_create_database_script(string custom_create_database_script)
+        {
+            return database.generate_create_database_script(custom_create_database_script);
+        }
+
+        public string generate_database_specific_script()
+        {
+            return database.generate_database_specific_script();
+        }
+
+        public string generate_support_tables_script()
+        {
+            return database.generate_support_tables_script();
+        }
+
+        public string create_database_script(string custom_create_database_script)
+        {
+            return string.Empty;
+        }
+
         public bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
             //TODO: Don't allow creation of the database - record everything from here on out as something that would run
@@ -169,6 +198,11 @@ namespace roundhouse.databases
         public void set_recovery_mode(bool simple)
         {
             Log.bound_to(this).log_an_info_event_containing("Changing the database recovery mode if it has one to {0}", simple ? "simple" : "full");
+        }
+
+        public string generate_recovery_mode_script()
+        {
+            return database.generate_recovery_mode_script();
         }
 
         public void backup_database(string output_path_minus_database)
@@ -183,19 +217,26 @@ namespace roundhouse.databases
             throw new ApplicationException(message);
         }
 
-        public void delete_database_if_it_exists()
+        public string delete_database_if_it_exists()
         {
             //TODO: Determine whether the database exists
             //database.delete_database_if_it_exists();
+            return delete_database_script();
         }
 
-        public void run_database_specific_tasks()
+        public string delete_database_script()
+        {
+            return string.Empty;
+        }
+
+        public string run_database_specific_tasks()
         {
             if (!database_exists)
             {
                 //TODO: figure out whether we do this or not
                 //database.run_database_specific_tasks();
             }
+            return string.Empty;
         }
 
         public void create_or_update_roundhouse_tables()
@@ -203,10 +244,11 @@ namespace roundhouse.databases
             database.create_or_update_roundhouse_tables();
         }
 
-        public void run_sql(string sql_to_run,ConnectionType connection_type)
+        public string run_sql(string sql_to_run,ConnectionType connection_type)
         {
             Log.bound_to(this).log_an_info_event_containing("Running statemtent: {0}{1}", Environment.NewLine, sql_to_run);
-            //database.run_sql(sql_to_run);
+            //return database.run_sql(sql_to_run);
+            return string.Empty;
         }
         
         public object run_sql_scalar(string sql_to_run,ConnectionType connection_type)
@@ -219,6 +261,16 @@ namespace roundhouse.databases
         public void insert_script_run(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id)
         {
             // database.insert_script_run(script_name, sql_to_run, sql_to_run_hash, run_this_script_once, version_id);
+        }
+
+        public string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            return string.Empty;
         }
 
         public void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
@@ -236,9 +288,19 @@ namespace roundhouse.databases
             return string.Empty;
         }
 
+        public long get_version_id_from_database()
+        {
+            return database.get_version_id_from_database();
+        }
+
         public long insert_version_and_get_version_id(string repository_path, string repository_version)
         {
             return 0;
+        }
+
+        public string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            return database.generate_insert_version_and_get_version_id_script(repository_path, repository_version);
         }
 
         public bool has_run_script_already(string script_name)
@@ -249,6 +311,11 @@ namespace roundhouse.databases
             }
 
             return false;
+        }
+
+        public bool has_roundhouse_support_tables()
+        {
+            return database.has_roundhouse_support_tables();
         }
 
         public string get_current_script_hash(string script_name)

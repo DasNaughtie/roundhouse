@@ -64,10 +64,13 @@ namespace roundhouse.databases
 {
     using System;
     using infrastructure.app;
-    
+
+    using roundhouse.infrastructure;
+
     public interface Database : IDisposable
     {
         ConfigurationPropertyHolder configuration { get; set; }
+
         string server_name { get; set; }
         string database_name { get; set; }
         string provider { get; set; }
@@ -92,21 +95,39 @@ namespace roundhouse.databases
         void close_admin_connection();
         void rollback();
 
+        string create_database_script();
+
+        // (---)
+        string generate_create_database_script(string custom_create_database_script);
+
+        string generate_database_specific_script();
+
+        string generate_support_tables_script();
+
         bool create_database_if_it_doesnt_exist(string custom_create_database_script);
         void set_recovery_mode(bool simple);
+        string generate_recovery_mode_script();
         void backup_database(string output_path_minus_database);
         void restore_database(string restore_from_path, string custom_restore_options);
-        void delete_database_if_it_exists();
-        void run_database_specific_tasks();
+        string delete_database_if_it_exists();
+
+        string delete_database_script();
+        string run_database_specific_tasks();
         void create_or_update_roundhouse_tables();
-        void run_sql(string sql_to_run,ConnectionType connection_type);
+        string run_sql(string sql_to_run,ConnectionType connection_type);
         object run_sql_scalar(string sql_to_run, ConnectionType connection_type);
         void insert_script_run(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id);
+        string generate_insert_scripts_run_script(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id);
         void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path);
 
         string get_version(string repository_path);
+
+        long get_version_id_from_database();
         long insert_version_and_get_version_id(string repository_path, string repository_version);
+        string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version);
         bool has_run_script_already(string script_name);
+
+        bool has_roundhouse_support_tables();
         string get_current_script_hash(string script_name);
         //object run_sql_scalar(string sql_to_run);
     }

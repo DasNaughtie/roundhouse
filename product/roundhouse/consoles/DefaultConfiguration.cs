@@ -5,7 +5,7 @@ namespace roundhouse.consoles
     using infrastructure.app;
     using infrastructure.logging;
 
-    public sealed class DefaultConfiguration : ConfigurationPropertyHolder
+    public class DefaultConfiguration : ConfigurationPropertyHolder
     {
         public Logger Logger { get; set; }
         public string ServerName { get; set; }
@@ -52,6 +52,8 @@ namespace roundhouse.consoles
         public bool RecoveryModeSimple { get; set; }
         public bool Debug { get; set; }
         public bool DryRun { get; set; }
+        public bool ExploreChangeDrop { get; set; }
+        public bool SimpleOutput { get; set; }
         public bool Baseline { get; set; }
         public bool RunAllAnyTimeScripts { get; set; }
         public bool DisableTokenReplacement { get; set; }

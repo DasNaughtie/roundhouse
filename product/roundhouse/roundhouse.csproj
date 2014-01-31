@@ -115,6 +115,7 @@
     <Compile Include="infrastructure.app\builders\VersionResolverBuilder.cs" />
     <Compile Include="infrastructure.app\DatabaseTypeSynonyms.cs" />
     <Compile Include="infrastructure.app\persistence\NHibernateMigrationSessionFactory.cs" />
+    <Compile Include="infrastructure\CreateScriptEventArgs.cs" />
     <Compile Include="infrastructure\extensions\ObjectExtensions.cs" />
     <Compile Include="infrastructure\logging\custom\ConsoleLogger.cs" />
     <Compile Include="infrastructure\persistence\AuditEventListener.cs" />
@@ -215,6 +216,9 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\RoundhousE.snk">
+      <Link>RoundhousE.snk</Link>
+    </None>
     <None Include="packages.config">
       <SubType>Designer</SubType>
     </None>

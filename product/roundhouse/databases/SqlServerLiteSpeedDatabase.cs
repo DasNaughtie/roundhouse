@@ -4,6 +4,8 @@ namespace roundhouse.databases
     using infrastructure.app;
     using infrastructure.persistence;
 
+    using roundhouse.infrastructure;
+
     public sealed class SqlServerLiteSpeedDatabase : Database
     {
         private readonly Database database;
@@ -18,6 +20,8 @@ namespace roundhouse.databases
             get { return database.configuration; }
             set { database.configuration = value; }
         }
+
+        public event CreateScriptHandler create_script_handler;
 
         public string connection_string
         {
@@ -148,6 +152,26 @@ namespace roundhouse.databases
             database.rollback();
         }
 
+        public string create_database_script()
+        {
+            return database.create_database_script();
+        }
+
+        public string generate_create_database_script(string custom_create_database_script)
+        {
+            return database.generate_create_database_script(custom_create_database_script);
+        }
+
+        public string generate_database_specific_script()
+        {
+            return database.generate_database_specific_script();
+        }
+
+        public string generate_support_tables_script()
+        {
+            return database.generate_support_tables_script();
+        }
+
         public bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
             return database.create_database_if_it_doesnt_exist(custom_create_database_script);
@@ -156,6 +180,11 @@ namespace roundhouse.databases
         public void set_recovery_mode(bool simple)
         {
             database.set_recovery_mode(simple);
+        }
+
+        public string generate_recovery_mode_script()
+        {
+            return database.generate_recovery_mode_script();
         }
 
         public void backup_database(string output_path_minus_database)
@@ -191,14 +220,19 @@ namespace roundhouse.databases
             command_timeout = current_timeout;
         }
 
-        public void delete_database_if_it_exists()
+        public string delete_database_if_it_exists()
         {
-            database.delete_database_if_it_exists();
+            return database.delete_database_if_it_exists();
         }
 
-        public void run_database_specific_tasks()
+        public string delete_database_script()
         {
-            database.run_database_specific_tasks();
+            return string.Empty;
+        }
+
+        public string run_database_specific_tasks()
+        {
+            return database.run_database_specific_tasks();
         }
 
         public void create_or_update_roundhouse_tables()
@@ -206,9 +240,9 @@ namespace roundhouse.databases
             database.create_or_update_roundhouse_tables();
         }
 
-        public void run_sql(string sql_to_run,ConnectionType connection_type)
+        public string run_sql(string sql_to_run,ConnectionType connection_type)
         {
-            database.run_sql(sql_to_run,connection_type);
+            return database.run_sql(sql_to_run,connection_type);
         }    
         
         public object run_sql_scalar(string sql_to_run,ConnectionType connection_type)
@@ -221,6 +255,16 @@ namespace roundhouse.databases
             database.insert_script_run(script_name, sql_to_run, sql_to_run_hash, run_this_script_once, version_id);
         }
 
+        public string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            return string.Empty;
+        }
+
         public void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
         {
             database.insert_script_run_error(script_name, sql_to_run, sql_erroneous_part, error_message, repository_version, repository_path);
@@ -231,14 +275,29 @@ namespace roundhouse.databases
             return database.get_version(repository_path);
         }
 
+        public long get_version_id_from_database()
+        {
+            return database.get_version_id_from_database();
+        }
+
         public long insert_version_and_get_version_id(string repository_path, string repository_version)
         {
             return database.insert_version_and_get_version_id(repository_path, repository_version);
         }
 
+        public string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            return database.generate_insert_version_and_get_version_id_script(repository_path, repository_version);
+        }
+
         public bool has_run_script_already(string script_name)
         {
             return database.has_run_script_already(script_name);
+        }
+
+        public bool has_roundhouse_support_tables()
+        {
+            return database.has_roundhouse_support_tables();
         }
 
         public string get_current_script_hash(string script_name)

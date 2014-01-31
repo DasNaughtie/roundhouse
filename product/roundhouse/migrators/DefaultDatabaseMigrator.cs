@@ -9,21 +9,30 @@ namespace roundhouse.migrators
     using infrastructure.app.tokens;
     using infrastructure.extensions;
     using infrastructure.logging;
+
+    using roundhouse.infrastructure;
+
     using sqlsplitters;
     using Environment = roundhouse.environments.Environment;
 
-    public sealed class DefaultDatabaseMigrator : DatabaseMigrator
+    public class DefaultDatabaseMigrator : DatabaseMigrator
     {
         public Database database { get; set; }
-        private readonly CryptographicService crypto_provider;
-        private readonly ConfigurationPropertyHolder configuration;
-        private readonly bool restoring_database;
-        private readonly string restore_path;
-        private readonly string custom_restore_options;
-        private readonly string output_path;
-        private readonly bool error_on_one_time_script_changes;
-        private bool running_in_a_transaction;
-        private readonly bool is_running_all_any_time_scripts;
+
+        public event CreateScriptHandler create_script_handler;
+
+        public bool is_running_a_dry_run { get; set; }
+
+        protected CryptographicService crypto_provider;
+        protected ConfigurationPropertyHolder configuration;
+        protected bool restoring_database;
+        protected string restore_path;
+        protected string custom_restore_options;
+        protected string output_path;
+        protected bool throw_error_on_one_time_script_changes;
+        protected bool running_in_a_transaction;
+        protected bool is_running_all_any_time_scripts;
+
 
         public DefaultDatabaseMigrator(Database database, CryptographicService crypto_provider, ConfigurationPropertyHolder configuration)
         {
@@ -34,7 +43,7 @@ namespace roundhouse.migrators
             restore_path = configuration.RestoreFromPath;
             custom_restore_options = configuration.RestoreCustomOptions;
             output_path = configuration.OutputPath;
-            error_on_one_time_script_changes = !configuration.WarnOnOneTimeScriptChanges;
+            throw_error_on_one_time_script_changes = !configuration.WarnOnOneTimeScriptChanges;
             is_running_all_any_time_scripts = configuration.RunAllAnyTimeScripts;
         }
 
@@ -64,20 +73,31 @@ namespace roundhouse.migrators
             database.close_connection();
         }
 
+        protected virtual void log_info_event_on_bound_logger(string message, params object[] args)
+        {
+            Log.bound_to(this).log_an_info_event_containing(message, args);
+        }
+
+        protected virtual void log_debug_event_on_bound_logger(string message, params object[] args)
+        {
+            Log.bound_to(this).log_a_debug_event_containing(message, args);
+        }
+
+        protected virtual void log_warning_event_on_bound_logger(string message, params object[] args)
+        {
+            Log.bound_to(this).log_a_warning_event_containing(message, args);
+        }
+
         public bool create_or_restore_database(string custom_create_database_script)
         {
             var database_created = false;
 
-            if (string.IsNullOrEmpty(custom_create_database_script))
-            {
-                Log.bound_to(this).log_an_info_event_containing("Creating {0} database on {1} server if it doesn't exist.", database.database_name, database.server_name);
-            }
-            else
-            {
-                Log.bound_to(this).log_an_info_event_containing("Creating {0} database on {1} server with custom script.", database.database_name, database.server_name);
-            }
+            log_what_we_are_about_to_do_create_or_restore(custom_create_database_script);
 
-            database_created = database.create_database_if_it_doesnt_exist(custom_create_database_script);
+            if (configuration.DryRun == false)
+            {
+                database_created = database.create_database_if_it_doesnt_exist(custom_create_database_script);
+            }
 
             if (restoring_database)
             {
@@ -93,23 +113,85 @@ namespace roundhouse.migrators
             return database_created;
         }
 
+        private void log_what_we_are_about_to_do_create_or_restore(string custom_create_database_script)
+        {
+            if (configuration.DryRun)
+            {
+                if (string.IsNullOrEmpty(custom_create_database_script))
+                {
+                    this.log_info_event_on_bound_logger(
+                        "-DryRun-Would have created {0} database on {1} server (if it didn't exist).",
+                        this.database.database_name,
+                        this.database.server_name);
+                }
+                else
+                {
+                    this.log_info_event_on_bound_logger(
+                        "-DryRun-Would have created {0} database on {1} server with custom script.",
+                        this.database.database_name,
+                        this.database.server_name);
+                }
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(custom_create_database_script))
+                {
+                    log_info_event_on_bound_logger("Creating {0} database on {1} server if it doesn't exist.", database.database_name, database.server_name);
+                }
+                else
+                {
+                    log_info_event_on_bound_logger("Creating {0} database on {1} server with custom script.", database.database_name, database.server_name);
+                }
+
+            }
+        }
+
         public void backup_database_if_it_exists()
         {
-            database.backup_database(output_path);
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(
+                    "-DryRun-Would have attempted a backup on {0} database on {1} server.",
+                    database.database_name,
+                    database.server_name);
+            }
+            else
+            {
+                log_info_event_on_bound_logger(
+                    "Backing up {0} database on {1} server.",
+                    database.database_name,
+                    database.server_name);
+                database.backup_database(output_path);
+            }
         }
 
         public void restore_database(string restore_from_path, string restore_options)
         {
-            Log.bound_to(this).log_an_info_event_containing("Restoring {0} database on {1} server from path {2}.", database.database_name, database.server_name, restore_from_path);
-            database.restore_database(restore_from_path, restore_options);
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("-DryRun-Would have restored {0} database on {1} server from path {2}.", database.database_name, database.server_name, restore_from_path);
+            }
+            else
+            {
+                log_info_event_on_bound_logger("Restoring {0} database on {1} server from path {2}.", database.database_name, database.server_name, restore_from_path);
+                database.restore_database(restore_from_path, restore_options);
+            }
         }
 
-        public void set_recovery_mode(bool simple)
+        public string set_recovery_mode(bool simple)
         {
-            //database.open_connection(false);
-            Log.bound_to(this).log_an_info_event_containing("Setting recovery mode to '{0}' for database {1}.", simple ? "Simple":"Full", database.database_name );
-            database.set_recovery_mode(simple);
-            //database.close_connection();
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("-DryRun-Would have set recovery mode to '{0}' for database {1}.", simple ? "Simple" : "Full", database.database_name);
+            }
+            else
+            {
+                //database.open_connection(false);
+                log_info_event_on_bound_logger("Setting recovery mode to '{0}' for database {1}.", simple ? "Simple" : "Full", database.database_name);
+                database.set_recovery_mode(simple);
+                //database.close_connection();
+            }
+            return database.generate_recovery_mode_script();
         }
 
         public void run_roundhouse_support_tasks()
@@ -120,12 +202,24 @@ namespace roundhouse.migrators
                 database.open_connection(false);
             }
 
-            Log.bound_to(this).log_an_info_event_containing(" Running database type specific tasks.");
-            database.run_database_specific_tasks();
-            Log.bound_to(this).log_an_info_event_containing(" Creating [{0}] table if it doesn't exist.", database.version_table_name);
-            Log.bound_to(this).log_an_info_event_containing(" Creating [{0}] table if it doesn't exist.", database.scripts_run_table_name);
-            Log.bound_to(this).log_an_info_event_containing(" Creating [{0}] table if it doesn't exist.", database.scripts_run_errors_table_name);
-            database.create_or_update_roundhouse_tables();
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger("-DryRun-Would run database type specific tasks.");
+                //database.run_database_specific_tasks();
+                log_info_event_on_bound_logger(" -> Would create [{0}] table if it didn't exist.", database.version_table_name);
+                log_info_event_on_bound_logger(" -> Would create [{0}] table if it didn't exist.", database.scripts_run_table_name);
+                log_info_event_on_bound_logger(" -> Would create [{0}] table if it didn't exist.", database.scripts_run_errors_table_name);
+                // TODO (PMO): Make sure the RoundHouse support tasks make it into the drop folder
+            }
+            else
+            {
+                log_info_event_on_bound_logger("Running database type specific tasks.");
+                database.run_database_specific_tasks();
+                log_info_event_on_bound_logger(" -> Creating [{0}] table if it doesn't exist.", database.version_table_name);
+                log_info_event_on_bound_logger(" -> Creating [{0}] table if it doesn't exist.", database.scripts_run_table_name);
+                log_info_event_on_bound_logger(" -> Creating [{0}] table if it doesn't exist.", database.scripts_run_errors_table_name);
+                database.create_or_update_roundhouse_tables();
+            }
 
             if (running_in_a_transaction)
             {
@@ -147,65 +241,186 @@ namespace roundhouse.migrators
             return current_version;
         }
 
-        public void delete_database()
+        public string delete_database()
         {
-            Log.bound_to(this).log_an_info_event_containing("Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
-            database.delete_database_if_it_exists();
+            string delete_script;
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(" -> Would have deleted {0} database on {1} server if it existed.", database.database_name, database.server_name);
+                delete_script = database.delete_database_script();
+            }
+            else
+            {
+                log_info_event_on_bound_logger(" -> Deleting {0} database on {1} server if it exists.", database.database_name, database.server_name);
+                delete_script = database.delete_database_if_it_exists();
+            }
+
+            return delete_script;
         }
 
         public long version_the_database(string repository_path, string repository_version)
         {
-            Log.bound_to(this).log_an_info_event_containing(" Versioning {0} database with version {1} based on {2}.", database.database_name, repository_version, repository_path);
-            return database.insert_version_and_get_version_id(repository_path, repository_version);
+            long versionId;
+
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(" -> Would version {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
+                versionId = database.get_version_id_from_database();
+            }
+            else
+            {
+                log_info_event_on_bound_logger(" -> Versioning {0} database with version {1} based on path \"{2}\".", database.database_name, repository_version, repository_path);
+                versionId = database.insert_version_and_get_version_id(repository_path, repository_version);
+            }
+
+            if (create_script_handler != null)
+            {
+                var sql = database.generate_insert_version_and_get_version_id_script( repository_path, repository_version);
+                create_script_handler(this, new CreateScriptEventArgs("VersionTheDatabase", sql, false));
+            }
+
+            return versionId;
         }
 
         public bool run_sql(string sql_to_run, string script_name, bool run_this_script_once, bool run_this_script_every_time, long version_id, Environment environment, string repository_version, string repository_path, ConnectionType connection_type)
         {
             bool this_sql_ran = false;
 
-            if (this_is_a_one_time_script_that_has_changes_but_has_already_been_run(script_name, sql_to_run, run_this_script_once))
-            {
-                if (error_on_one_time_script_changes)
-                {
-                    database.rollback();
-                    string error_message = string.Format("{0} has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set warnOnOneTimeScriptChanges to true and run again. Stopping execution.", script_name);
-                    record_script_in_scripts_run_errors_table(script_name, sql_to_run, sql_to_run, error_message, repository_version, repository_path);
-                    database.close_connection();
-                    throw new Exception(error_message);
-                }
-                Log.bound_to(this).log_a_warning_event_containing("{0} is a one time script that has changed since it was run.", script_name);
-            }
+            handle_one_time_already_run(sql_to_run, script_name, run_this_script_once, repository_version, repository_path);
 
-            if (this_is_an_environment_file_and_its_in_the_right_environment(script_name, environment)
-                && this_script_should_run(script_name, sql_to_run, run_this_script_once, run_this_script_every_time))
-            {
-                Log.bound_to(this).log_an_info_event_containing(" Running {0} on {1} - {2}.", script_name, database.server_name, database.database_name);
+            // run once so we don't write to the screen twice
+            var good_environment_file   = this_is_an_environment_file_and_its_in_the_right_environment(script_name, environment);
+            var is_not_environment_file = this_is_not_an_environment_file(script_name);
+            var script_should_run       = this_script_should_run(script_name, sql_to_run, run_this_script_once, run_this_script_every_time);
 
-                foreach (var sql_statement in get_statements_to_run(sql_to_run))
-                {
-                    try
-                    {
-                        database.run_sql(sql_statement, connection_type);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.bound_to(this).log_an_error_event_containing("Error executing file '{0}': statement running was '{1}'", script_name, sql_statement);
-                        database.rollback();
-                        
-                        record_script_in_scripts_run_errors_table(script_name, sql_to_run, sql_statement, ex.Message, repository_version, repository_path);
-                        database.close_connection();
-                        throw;
-                    }
-                }
-                record_script_in_scripts_run_table(script_name, sql_to_run, run_this_script_once, version_id);
+            if ((good_environment_file || is_not_environment_file) && script_should_run)
+            {
+                run_all_the_sql_statements(sql_to_run, script_name, run_this_script_once, version_id, repository_version, repository_path, connection_type);
                 this_sql_ran = true;
             }
-            else
+            else if (is_not_environment_file)
             {
-                Log.bound_to(this).log_an_info_event_containing(" Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
+                // exclude good_environment files because they already printed to the screen that the file was skipped.
+                log_info_event_on_bound_logger("    Skipped {0} - {1}.", script_name, run_this_script_once ? "One time script" : "No changes were found to run");
             }
 
             return this_sql_ran;
+        }
+
+        protected void run_all_the_sql_statements(
+            string sql_to_run,
+            string script_name,
+            bool run_this_script_once,
+            long version_id,
+            string repository_version,
+            string repository_path,
+            ConnectionType connection_type)
+        {
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(
+                    " -> Would have run {0} on {1} - {2}.",
+                    script_name,
+                    database.server_name,
+                    database.database_name);
+
+                record_script_in_scripts_run_table(script_name, sql_to_run, run_this_script_once, version_id);
+            }
+            else
+            {
+                log_info_event_on_bound_logger(
+                    " -> Running {0} on {1} - {2}.",
+                    script_name,
+                    database.server_name,
+                    database.database_name);
+
+                foreach (var sql_statement in get_statements_to_run(sql_to_run))
+                {
+                    run_sql_in_database(
+                        sql_to_run,
+                        script_name,
+                        repository_version,
+                        repository_path,
+                        connection_type,
+                        sql_statement);
+                }
+                record_script_in_scripts_run_table(script_name, sql_to_run, run_this_script_once, version_id);
+            }
+        }
+
+        private void run_sql_in_database(
+            string sql_to_run,
+            string script_name,
+            string repository_version,
+            string repository_path,
+            ConnectionType connection_type,
+            string sql_statement)
+        {
+            try
+            {
+                database.run_sql(sql_statement, connection_type);
+            }
+            catch (Exception ex)
+            {
+                Log.bound_to(this)
+                    .log_an_error_event_containing(
+                        "Error executing file '{0}': statement running was '{1}'",
+                        script_name,
+                        sql_statement);
+                database.rollback();
+
+                record_script_in_scripts_run_errors_table(
+                    script_name,
+                    sql_to_run,
+                    sql_statement,
+                    ex.Message,
+                    repository_version,
+                    repository_path);
+                database.close_connection();
+                throw;
+            }
+        }
+
+        protected void handle_one_time_already_run(
+            string sql_to_run,
+            string script_name,
+            bool run_this_script_once,
+            string repository_version,
+            string repository_path)
+        {
+            if (this_is_a_one_time_script_that_has_changes_but_has_already_been_run(
+                script_name,
+                sql_to_run,
+                run_this_script_once))
+            {
+                if (throw_error_on_one_time_script_changes)
+                {
+                    handle_error_on_one_time_script_change(sql_to_run, script_name, repository_version, repository_path);
+                }
+                log_warning_event_on_bound_logger("{0} is a one time script that has changed since it was run.", script_name);
+            }
+        }
+
+        private void handle_error_on_one_time_script_change(
+            string sql_to_run,
+            string script_name,
+            string repository_version,
+            string repository_path)
+        {
+            database.rollback();
+            string error_message =
+                string.Format(
+                    "{0} has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set warnOnOneTimeScriptChanges to true and run again. Stopping execution.",
+                    script_name);
+            record_script_in_scripts_run_errors_table(
+                script_name,
+                sql_to_run,
+                sql_to_run,
+                error_message,
+                repository_version,
+                repository_path);
+            database.close_connection();
+            throw new Exception(error_message);
         }
 
         public IEnumerable<string> get_statements_to_run(string sql_to_run)
@@ -229,14 +444,37 @@ namespace roundhouse.migrators
 
         public void record_script_in_scripts_run_table(string script_name, string sql_to_run, bool run_this_script_once, long version_id)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Recording {0} script ran on {1} - {2}.", script_name, database.server_name, database.database_name);
-            database.insert_script_run(script_name, sql_to_run, create_hash(sql_to_run), run_this_script_once, version_id);
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(" -> Would record {0} script ran on {1} - {2} in the {3} table.", script_name, database.server_name, database.database_name, database.scripts_run_table_name);
+            }
+            else
+            {
+                log_debug_event_on_bound_logger(" -> Recording {0} script ran on {1} - {2}.", script_name, database.server_name, database.database_name);
+                database.insert_script_run(script_name, sql_to_run, create_hash(sql_to_run), run_this_script_once, version_id);
+            }
+
+            // create the script file in the migrations folder for inserting new row in scripts run
+            if (create_script_handler != null)
+            {
+                var sql = database.generate_insert_scripts_run_script(script_name, sql_to_run, create_hash(sql_to_run), run_this_script_once, version_id);
+                create_script_handler(this, new CreateScriptEventArgs("RecordScriptRun-" + script_name, sql, false));
+            }
         }
 
         public void record_script_in_scripts_run_errors_table(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version, string repository_path)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Recording {0} script ran with error on {1} - {2}.", script_name, database.server_name, database.database_name);
-            database.insert_script_run_error(script_name, sql_to_run, sql_erroneous_part, error_message, repository_version, repository_path);
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(" -> Would have recorded {0} script ran with error on {1} - {2} in the {3} table.",
+                    script_name, database.server_name, database.database_name,
+                    database.scripts_run_errors_table_name);
+            }
+            else
+            {
+                log_debug_event_on_bound_logger(" -> Recording {0} script ran with error on {1} - {2}.", script_name, database.server_name, database.database_name);
+                database.insert_script_run_error(script_name, sql_to_run, sql_erroneous_part, error_message, repository_version, repository_path);
+            }
         }
 
         private string create_hash(string sql_to_run)
@@ -246,12 +484,7 @@ namespace roundhouse.migrators
 
         public bool this_is_an_every_time_script(string script_name, bool run_this_script_every_time)
         {
-            bool this_is_an_everytime_script = false;
-
-            if (run_this_script_every_time)
-            {
-                this_is_an_everytime_script = true;
-            }
+            var this_is_an_everytime_script = run_this_script_every_time;
 
             if (script_name.to_lower().StartsWith("everytime."))
             {
@@ -283,9 +516,13 @@ namespace roundhouse.migrators
             {
                 old_text_hash = database.get_current_script_hash(script_name);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                Log.bound_to(this).log_a_warning_event_containing("{0} - I didn't find this script executed before.", script_name);
+                log_warning_event_on_bound_logger("{0} - I didn't find this script executed before. {1}{2}Stack Trace:{2}{3}", 
+                    script_name, 
+                    ex.Message,
+                    System.Environment.NewLine,
+                    ex.StackTrace);
             }
 
             if (string.IsNullOrEmpty(old_text_hash)) return true;
@@ -300,7 +537,7 @@ namespace roundhouse.migrators
                 hash_is_same = have_same_hash_ignoring_platform(sql_to_run, old_text_hash);
                 if (hash_is_same)
                 {
-                    Log.bound_to(this).log_a_warning_event_containing("Script {0} had different line endings than before but equal content", script_name);
+                    log_warning_event_on_bound_logger("Script {0} had different line endings than before but equal content", script_name);
                 }
             }
 
@@ -353,29 +590,44 @@ namespace roundhouse.migrators
 
         public bool this_is_an_environment_file_and_its_in_the_right_environment(string script_name, Environment environment)
         {
-            Log.bound_to(this).log_a_debug_event_containing("Checking to see if {0} is an environment file. We are in the {1} environment.", script_name, environment.name);
-            if (!script_name.to_lower().Contains(".env."))
+            log_debug_event_on_bound_logger("Checking to see if {0} is an environment file. We are in the {1} environment.", script_name, environment.name);
+            if (this_is_not_an_environment_file(script_name))
             {
-                // return true because this is NOT an environment file for the next check
-                return true;
+                return false;
             }
 
-            bool environment_file_is_in_the_right_environment = false;
-
-            if (script_name.to_lower().StartsWith(environment.name.to_lower() + "."))
-            {
-                environment_file_is_in_the_right_environment = true;
-            }
+            bool environment_file_is_in_the_right_environment = script_name.to_lower().StartsWith(environment.name.to_lower() + ".");
 
             if (script_name.to_lower().Contains("." + environment.name.to_lower() + "."))
             {
                 environment_file_is_in_the_right_environment = true;
             }
 
-            Log.bound_to(this).log_an_info_event_containing(" {0} is an environment file. We are in the {1} environment. This will{2} run based on this check.",
-                                                            script_name, environment.name, environment_file_is_in_the_right_environment ? string.Empty : " NOT");
+            if (configuration.DryRun)
+            {
+                log_info_event_on_bound_logger(
+                    " {3} {0} is an environment file. We are in the {1} environment. This would{2} have run.",
+                    script_name,
+                    environment.name,
+                    environment_file_is_in_the_right_environment ? string.Empty : " NOT",
+                    environment_file_is_in_the_right_environment ? "->" : "  ");
+            }
+            else
+            {
+                log_info_event_on_bound_logger(
+                    " {3} {0} is an environment file. We are in the {1} environment. This will{2} run.",
+                    script_name,
+                    environment.name,
+                    environment_file_is_in_the_right_environment ? string.Empty : " NOT",
+                    environment_file_is_in_the_right_environment ? "->" : "  ");
+            }
 
             return environment_file_is_in_the_right_environment;
+        }
+
+        public static bool this_is_not_an_environment_file(string script_name)
+        {
+            return !script_name.to_lower().Contains(".env.");
         }
     }
 }

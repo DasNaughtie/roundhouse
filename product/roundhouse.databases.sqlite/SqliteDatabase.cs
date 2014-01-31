@@ -98,15 +98,24 @@
             return string.Empty;
         }
 
-        public override void delete_database_if_it_exists()
+        public override string delete_database_if_it_exists()
         {
             string db_file = delete_database_script();
-            if (string.IsNullOrEmpty(db_file)) return;
+            if (string.IsNullOrEmpty(db_file))
+            {
+                return string.Empty;
+            }
 
             close_admin_connection();
             close_connection();
 
-            if (File.Exists(db_file)) File.Delete(db_file);
+            if (File.Exists(db_file))
+            {
+                File.Delete(db_file);
+                return string.Format("DEL \"{0}\"\r\n\r\n", db_file);
+            }
+
+            return string.Empty;
         }
 
         public override string delete_database_script()
@@ -115,9 +124,20 @@
             return string.Empty;
         }
 
-        public override void run_database_specific_tasks()
+        public override string generate_database_specific_script()
+        {
+            return string.Empty;
+        }
+
+        public override string run_database_specific_tasks()
         {
             Log.bound_to(this).log_a_debug_event_containing("Sqlite has no database specific tasks. Moving along now...");
+            return generate_database_specific_script();
+        }
+
+        public override bool has_roundhouse_support_tables()
+        {
+            throw new NotImplementedException("Sqlite Databases don't support this yet. Don't use the dryrun flag against it.");
         }
 
         public override string set_recovery_mode_script(bool simple)

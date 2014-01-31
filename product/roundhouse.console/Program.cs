@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Reflection;
 using log4net;
-using log4net.Core;
-using log4net.Repository;
-using log4net.Repository.Hierarchy;
 using roundhouse.consoles;
 using roundhouse.databases;
 using roundhouse.folders;
@@ -297,6 +293,12 @@ namespace roundhouse.console
                 .Add("dryrun",
                      "DryRun - This instructs RH to log what would have run, but not to actually run anything against the database. Use this option if you are trying to figure out what RH is going to do.",
                      option => configuration.DryRun = option != null)
+                .Add("simpleoutput",
+                     "SimpleOutput - This instructs RH to put the SQL it would run in the change_drop folder in sequentially numbered files. This is a good option for enterprise environments that won't allow roundhouse to run in production environments. You can simply send the contents of the SimpleOutput folder to the deployment team to run manually.",
+                     option => configuration.SimpleOutput = option != null)
+                .Add("explore",
+                    "Explore - This instructs RH to open a Windows Explorer window pointed to the change_drop folder after it runs. Useful for seeing the scripts that ran (or would have run during a dry run).",
+                    option => configuration.ExploreChangeDrop = option != null)
                 .Add("searchallinsteadoftraverse=|searchallsubdirectoriesinsteadoftraverse=",
                      "SearchAllSubdirectoriesInsteadOfTraverse - Each Migration folder's subdirectories are traversed by default. This option pulls back scripts from the main directory and all subdirectories at once. Defaults to 'false'",
                      option => configuration.SearchAllSubdirectoriesInsteadOfTraverse = option != null)
@@ -346,6 +348,8 @@ namespace roundhouse.console
                         "/disabletokenreplacement " +
                         "/baseline " +
                         "/dryrun " +
+                        "/simpleoutput " +
+                        "/explore " +
                         "/search[allsubdirectories]insteadoftraverse" +
                         "]", Environment.NewLine);
                 show_help(usage_message, option_set);

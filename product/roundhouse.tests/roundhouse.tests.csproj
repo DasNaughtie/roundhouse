@@ -105,7 +105,6 @@
     </Compile>
     <Compile Include="databases\SqlServerDatabaseSpecs.cs" />
     <Compile Include="EmptyTestContainer.cs" />
-    <Compile Include="cryptography\CryptographicServiceSpecs.cs" />
     <Compile Include="infrastructure.app\tokens\TokenReplacerSpecs.cs" />
     <Compile Include="infrastructure\containers\ContainerSpecs.cs" />
     <Compile Include="infrastructure\containers\custom\StructureMapContainerSpecs.cs" />

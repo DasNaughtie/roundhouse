@@ -81,14 +81,34 @@ namespace roundhouse.databases.sqlserver2000
             return string.Format("Server={0};initial catalog={1};{2}", server_name, database_name, connection_options);
         }
 
-        public override void run_database_specific_tasks()
+        public override string generate_database_specific_script()
+        {
+            return string.Empty;
+        }
+
+        public override string run_database_specific_tasks()
         {
 
             Log.bound_to(this).log_a_debug_event_containing("FUTURE ENHANCEMENT: Should create a user by the name of RoundhousE.");
             //this.roundhouse_schema_name;
             //TODO: Create user
 
+            var sql = generate_database_specific_script();
+
             //run_sql(set_recovery_mode_script(simple)
+            return sql;
+        }
+
+        public override bool has_roundhouse_support_tables()
+        {
+            var sql = "IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRun]') AND type in (N'U')) " +
+            "    IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[ScriptsRunErrors]') AND type in (N'U'))" +
+            "        IF EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[RoundhousE].[Version]') AND type in (N'U'))" +
+            "            SELECT 1 AS HasRoundhousESupportTables " +
+            "ELSE " +
+            "    SELECT 0 AS HasRoundhousESupportTables";
+            var result = run_sql_scalar(sql, ConnectionType.Default) as int?;
+            return result.HasValue && result == 1;
         }
 
         public override string create_database_script()

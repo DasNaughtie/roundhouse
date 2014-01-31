@@ -114,9 +114,12 @@ namespace roundhouse.databases
             }
         }
 
-        protected override void run_sql(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters)
+        protected override string run_sql(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters)
         {
-            if (string.IsNullOrEmpty(sql_to_run)) return;
+            if (string.IsNullOrEmpty(sql_to_run))
+            {
+                return sql_to_run;
+            }
 
             //really naive retry logic. Consider Lokad retry policy
             //this is due to sql server holding onto a connection http://social.msdn.microsoft.com/Forums/en-US/adodotnetdataproviders/thread/99963999-a59b-4614-a1b9-869c6dff921e
@@ -129,6 +132,7 @@ namespace roundhouse.databases
                 Log.bound_to(this).log_a_debug_event_containing("Failure executing command, trying again. {0}{1}", Environment.NewLine, ex.ToString());
                 run_command_with(sql_to_run, connection_type, parameters);
             }
+            return sql_to_run;
         }
 
         private void run_command_with(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters)

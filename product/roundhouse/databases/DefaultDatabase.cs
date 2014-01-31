@@ -12,8 +12,12 @@ namespace roundhouse.databases
     using NHibernate;
     using NHibernate.Cfg;
     using NHibernate.Criterion;
+    using NHibernate.Hql.Ast.ANTLR;
     using NHibernate.Tool.hbm2ddl;
     using parameters;
+
+    using roundhouse.infrastructure;
+
     using sqlsplitters;
     using Environment = System.Environment;
     using Version = model.Version;
@@ -21,6 +25,7 @@ namespace roundhouse.databases
     public abstract class DefaultDatabase<DBCONNECTION> : Database
     {
         public ConfigurationPropertyHolder configuration { get; set; }
+
         public string server_name { get; set; }
         public string database_name { get; set; }
         public string provider { get; set; }
@@ -84,20 +89,22 @@ namespace roundhouse.databases
         public abstract string restore_database_script(string restore_from_path, string custom_restore_options);
         public abstract string delete_database_script();
 
+        public virtual string generate_database_specific_script()
+        {
+            return string.Empty;
+        }
+
+        public virtual string generate_support_tables_script()
+        {
+            return string.Empty;
+        }
+
         public virtual bool create_database_if_it_doesnt_exist(string custom_create_database_script)
         {
             bool database_was_created = false;
             try
             {
-                string create_script = create_database_script();
-                if (!string.IsNullOrEmpty(custom_create_database_script))
-                {
-                    create_script = custom_create_database_script;
-                    if (!configuration.DisableTokenReplacement)
-                    {
-                        create_script = TokenReplacer.replace_tokens(configuration, create_script);
-                    }
-                }
+                var create_script = generate_create_database_script(custom_create_database_script);
 
                 if (split_batch_statements)
                 {
@@ -128,6 +135,20 @@ namespace roundhouse.databases
             return database_was_created;
         }
 
+        public string generate_create_database_script(string custom_create_database_script)
+        {
+            string create_script = create_database_script();
+            if (!string.IsNullOrEmpty(custom_create_database_script))
+            {
+                create_script = custom_create_database_script;
+                if (!configuration.DisableTokenReplacement)
+                {
+                    create_script = TokenReplacer.replace_tokens(configuration, create_script);
+                }
+            }
+            return create_script;
+        }
+
         private bool? run_sql_scalar_boolean(string sql_to_run, ConnectionType connection_type)
         {
             var return_value = run_sql_scalar(sql_to_run, connection_type);
@@ -150,6 +171,11 @@ namespace roundhouse.databases
                     "{0} with provider {1} does not provide a facility for setting recovery mode to simple at this time.{2}{3}",
                     GetType(), provider, Environment.NewLine, ex.Message);
             }
+        }
+
+        public string generate_recovery_mode_script()
+        {
+            return set_recovery_mode_script(configuration.RecoveryMode == RecoveryMode.Simple);
         }
 
         public void backup_database(string output_path_minus_database)
@@ -179,11 +205,11 @@ namespace roundhouse.databases
             }
         }
 
-        public virtual void delete_database_if_it_exists()
+        public virtual string delete_database_if_it_exists()
         {
             try
             {
-                run_sql(delete_database_script(), ConnectionType.Admin);
+                return run_sql(delete_database_script(), ConnectionType.Admin);
             }
             catch (Exception ex)
             {
@@ -194,7 +220,7 @@ namespace roundhouse.databases
             }
         }
 
-        public abstract void run_database_specific_tasks();
+        public abstract string run_database_specific_tasks();
 
         public virtual void create_or_update_roundhouse_tables()
         {
@@ -202,10 +228,11 @@ namespace roundhouse.databases
             s.Execute(false, true);
         }
 
-        public virtual void run_sql(string sql_to_run, ConnectionType connection_type)
+        public virtual string run_sql(string sql_to_run, ConnectionType connection_type)
         {
             Log.bound_to(this).log_a_debug_event_containing("[SQL] Running (on connection '{0}'): {1}{2}", connection_type.ToString(), Environment.NewLine, sql_to_run);
             run_sql(sql_to_run, connection_type, null);
+            return sql_to_run;
         }
 
         public virtual object run_sql_scalar(string sql_to_run, ConnectionType connection_type)
@@ -214,7 +241,7 @@ namespace roundhouse.databases
             return run_sql_scalar(sql_to_run, connection_type, null);
         }
 
-        protected abstract void run_sql(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters);
+        protected abstract string run_sql(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters);
         protected abstract object run_sql_scalar(string sql_to_run, ConnectionType connection_type, IList<IParameter<IDbDataParameter>> parameters);
 
         public void insert_script_run(string script_name, string sql_to_run, string sql_to_run_hash, bool run_this_script_once, long version_id)
@@ -239,6 +266,17 @@ namespace roundhouse.databases
                     GetType(), provider, Environment.NewLine, ex.Message);
                 throw;
             }
+        }
+
+        public virtual string generate_insert_scripts_run_script(
+            string script_name,
+            string sql_to_run,
+            string sql_to_run_hash,
+            bool run_this_script_once,
+            long version_id)
+        {
+            // todo: make this work for other databases (not just SQL server)
+            return string.Empty;
         }
 
         public void insert_script_run_error(string script_name, string sql_to_run, string sql_erroneous_part, string error_message, string repository_version,
@@ -284,13 +322,40 @@ namespace roundhouse.databases
                     version = items[0].version;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for retrieving versions at this time.",
-                                                                  GetType(), provider);
+                if (configuration.DryRun)
+                {
+                    Log.bound_to(this).log_an_info_event_containing("{0}{0}", System.Environment.NewLine);
+                    Log.bound_to(this).log_an_info_event_containing("    Error: Ran into a problem while trying to get the database version. This");
+                    Log.bound_to(this).log_an_info_event_containing("           is probably because you haven't run RoundhousE on this database");
+                    Log.bound_to(this).log_an_info_event_containing("           before. DryRun doesn't work unless you've created the RoundhousE");
+                    Log.bound_to(this).log_an_info_event_containing("           support tables. You can create them by running RoundhousE against");
+                    Log.bound_to(this).log_an_info_event_containing("           the database WITHOUT the dryrun switch.{0}{0}");
+                    Log.bound_to(this).log_an_info_event_containing("           Alternatively, you can run try running the scripts here:");
+                    Log.bound_to(this).log_an_info_event_containing("           {0}{0}{1}", Environment.NewLine, generate_support_tables_script() );
+                    
+                    Log.bound_to(this).log_an_info_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
+                        GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
+
+                    throw new InvalidOperationException("DryRun without support tables.");
+                }
+                else { 
+                    Log.bound_to(this).log_a_warning_event_containing("{0} with provider {1} does not provide a facility for " +
+                        "retrieving versions at this time.",
+                        GetType(), provider);
+
+                    Log.bound_to(this).log_a_warning_event_containing("{0} {1} {2}Exception:{2}{3}{2}Stack Trace:{2}{4}",
+                        GetType(), provider, System.Environment.NewLine, ex.Message, ex.StackTrace);
+                }
             }
 
             return version;
+        }
+
+        public virtual long get_version_id_from_database()
+        {
+            return 0;
         }
 
         //get rid of the virtual
@@ -318,6 +383,13 @@ namespace roundhouse.databases
 
             return version_id;
         }
+
+        public virtual string generate_insert_version_and_get_version_id_script(string repository_path, string repository_version)
+        {
+            return string.Empty;
+        }
+
+        public abstract bool has_roundhouse_support_tables();
 
         public string get_current_script_hash(string script_name)
         {
