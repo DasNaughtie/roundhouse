@@ -338,7 +338,7 @@ namespace roundhouse.nunittests
             var ex =
                 Assert.Catch(
                     () => sut.HandleOneTimeAlreadyRun("SomeSQL", "SomeName", true, "SomeRepoVersion", "SomePath"));
-            StringAssert.Contains("SomeName has changed since the last time it was run. By default this is not allowed", ex.Message);
+            StringAssert.Contains("SomeName has changed since the last time it was run. The expected has was \"SomeOtherHash\". By default this is not allowed", ex.Message);
 
             sut.SetThrowErrorOnOneTimeScriptChanges(false);
             sut.HandleOneTimeAlreadyRun("SomeSQL", "SomeName", true, "SomeRepoVersion", "SomePath");

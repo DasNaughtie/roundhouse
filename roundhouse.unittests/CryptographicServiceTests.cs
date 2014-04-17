@@ -7,6 +7,10 @@ using roundhouse.cryptography;
 
 namespace roundhouse.unittests
 {
+    using System.Security.AccessControl;
+
+    using roundhouse.infrastructure.filesystem;
+
     [TestFixture]
     public class CryptographicServiceTests
     {
@@ -31,6 +35,15 @@ namespace roundhouse.unittests
             string text_to_hash  = "I want to see what the freak is going on here";
             string expected_hash = "TMGPZJmBhSO5uYbf/TBqNA==";
             Assert.AreEqual(expected_hash, md5_crypto.hash(text_to_hash));
+        }
+
+        [Test]
+        public void Add_Always_ReturnsTheSum()
+        {
+            var num1 = 1;
+            var num2 = 2;
+            var expected = 3;
+            Assert.AreEqual(expected, num1 + num2);
         }
     }
 }
