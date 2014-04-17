@@ -401,17 +401,16 @@ namespace roundhouse.migrators
             }
         }
 
-        private void handle_error_on_one_time_script_change(
-            string sql_to_run,
-            string script_name,
-            string repository_version,
-            string repository_path)
+        private void handle_error_on_one_time_script_change(string sql_to_run, string script_name, string repository_version, string repository_path)
         {
             database.rollback();
+            var expected_hash = create_hash(sql_to_run);
             string error_message =
                 string.Format(
-                    "{0} has changed since the last time it was run. By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set warnOnOneTimeScriptChanges to true and run again. Stopping execution.",
-                    script_name);
+                    "{0} has changed since the last time it was run. The expected has was \"{1}\". By default this is not allowed - scripts that run once should never change. To change this behavior to a warning, please set warnOnOneTimeScriptChanges to true and run again. Stopping execution.",
+                    script_name,
+                    expected_hash
+                    );
             record_script_in_scripts_run_errors_table(
                 script_name,
                 sql_to_run,
