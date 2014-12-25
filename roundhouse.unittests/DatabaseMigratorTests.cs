@@ -324,7 +324,19 @@ namespace roundhouse.nunittests
             A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(), 
                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), 
                 A.Dummy<String>())).WithAnyArguments().MustHaveHappened();
-        }        [Test]        public void RecordScriptInErrorsRun_WithDryRun_DoesNotRecordAndLogs()        {            var sut = MakeTestableSut(true);            sut.record_script_in_scripts_run_errors_table("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");            StringAssert.Contains(" -> Would have recorded SomeName script ran with error on ServerName - DbName in the ScriptsRunErrorsTable table.",                 sut.checkInfoLog.ToString());            A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(),                 A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();        }
+        }
+
+        [Test]
+        public void RecordScriptInErrorsRun_WithDryRun_DoesNotRecordAndLogs()
+        {
+            var sut = MakeTestableSut(true);
+            sut.record_script_in_scripts_run_errors_table("SomeName", "SomeSQL", "SomeSQLError", "SomeMessage", "SomeVersion", "SomePath");
+            StringAssert.Contains(" -> Would have recorded SomeName script ran with error on ServerName - DbName in the ScriptsRunErrorsTable table.", 
+                sut.checkInfoLog.ToString());
+            A.CallTo(() => sut.database.insert_script_run_error(A.Dummy<String>(), A.Dummy<String>(), 
+                A.Dummy<String>(), A.Dummy<String>(), A.Dummy<String>(), 
+                A.Dummy<String>())).WithAnyArguments().MustNotHaveHappened();
+        }
 
         [Test]
         [TestCase(true)]
@@ -343,9 +355,20 @@ namespace roundhouse.nunittests
             sut.SetThrowErrorOnOneTimeScriptChanges(false);
             sut.HandleOneTimeAlreadyRun("SomeSQL", "SomeName", true, "SomeRepoVersion", "SomePath");
             StringAssert.Contains("SomeName is a one time script that has changed since it was run.", sut.checkWarningLog.ToString());
-        }        [Test]        [TestCase(false)]        [TestCase(true)]        public void HandleOneTimeAlreadyRun_WithUnchangedAlreadyRunOneTimeScript_Ignores(bool dryRun)        {            var sut = MakeTestableSut(dryRun);            A.CallTo(() => sut.database.get_current_script_hash("SomeName")).Returns("SomeHash");            A.CallTo(() => sut.mockCryptoService.hash(A.Dummy<String>())).WithAnyArguments().Returns("SomeHash");            A.CallTo(() => sut.database.has_run_script_already("SomeName")).Returns(true);
+        }
+
+        [Test]
+        [TestCase(false)]
+        [TestCase(true)]
+        public void HandleOneTimeAlreadyRun_WithUnchangedAlreadyRunOneTimeScript_Ignores(bool dryRun)
+        {
+            var sut = MakeTestableSut(dryRun);
+            A.CallTo(() => sut.database.get_current_script_hash("SomeName")).Returns("SomeHash");
+            A.CallTo(() => sut.mockCryptoService.hash(A.Dummy<String>())).WithAnyArguments().Returns("SomeHash");
+            A.CallTo(() => sut.database.has_run_script_already("SomeName")).Returns(true);
             sut.HandleOneTimeAlreadyRun("SomeSQL", "SomeName", true, "SomeRepoVersion", "SomePath");
-            Assert.IsNullOrEmpty(sut.checkInfoLog.ToString());        }
+            Assert.IsNullOrEmpty(sut.checkInfoLog.ToString());
+        }
 
         [Test]
         public void RunAllTheSqlStatements_WithoutDryRun_RunsAndLogs()
@@ -413,7 +436,10 @@ namespace roundhouse.nunittests
                 ConnectionType.Default);
             Assert.AreEqual(expectedToRun, sqlRan);
             StringAssert.Contains(expectedInfo, sut.checkInfoLog.ToString());
-            StringAssert.Contains(expectedWarning, sut.checkWarningLog.ToString());        }        // ----
+            StringAssert.Contains(expectedWarning, sut.checkWarningLog.ToString());
+        }
+
+        // ----
         private TestableDefaultDatabaseMigrator MakeTestableSut(bool dryRun)
         {
             var sut = new TestableDefaultDatabaseMigrator();

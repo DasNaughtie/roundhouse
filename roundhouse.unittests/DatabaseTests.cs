@@ -126,6 +126,27 @@ namespace roundhouse.nunittests
             StringAssert.IsMatch(@"CREATE TABLE RoundhousE\.\[Version\]", sqlScript);
         }
 
+        [Test]
+        public void InitializeConnection_WithDbNameAndServerWithPort_ParsesCorrectly()
+        {
+            var configPropHolder = A.Fake<ConfigurationPropertyHolder>();
+            var connectionString = "Data Source=server.database.net,1234;Initial Catalog=DbName;User ID=userId;Password=password;Encrypt=true;Trusted_Connection=false;";
+            var db = MakeTestableSut();
+            db.database_name = "DbName";
+            db.connection_string = connectionString;
+            db.initialize_connections(configPropHolder);
+            StringAssert.Contains("Data Source=server.database.net,1234", configPropHolder.ConnectionString);
+            StringAssert.Contains("Initial Catalog=DbName", configPropHolder.ConnectionString);
+            StringAssert.Contains("User ID=userId", configPropHolder.ConnectionString);
+            StringAssert.Contains("Password=password", configPropHolder.ConnectionString);
+            StringAssert.Contains("Encrypt=true", configPropHolder.ConnectionString);
+            StringAssert.Contains("Trusted_Connection=false", configPropHolder.ConnectionString);
+            Assert.AreEqual("DbName", db.database_name);
+            Assert.AreEqual("server.database.net,1234", db.server_name);
+        }
+
+
+
         // test factories
         private TestableDatabase MakeTestableSut()
         {

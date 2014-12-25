@@ -40,7 +40,7 @@ namespace roundhouse.databases.sqlserver
                         server_name = part.Substring(part.IndexOf("=") + 1);
                     }
 
-                    if (string.IsNullOrEmpty(database_name) && (part.to_lower().Contains("initial catalog") || part.to_lower().Contains("database")))
+                    if (string.IsNullOrEmpty(database_name) && (part.to_lower().Contains("initial catalog") || part.Replace(" ", "").to_lower().Contains("database=")))
                     {
                         database_name = part.Substring(part.IndexOf("=") + 1);
                     }
