@@ -112,8 +112,7 @@ namespace roundhouse.runners
 
                 create_share_and_set_permissions_for_change_drop_folder();
 
-                var hasRoundhouseSupportTables = database_migrator.database.has_roundhouse_support_tables();
-                if (configuration.DryRun && hasRoundhouseSupportTables == false)
+                if (configuration.DryRun && !database_migrator.database.has_roundhouse_support_tables())
                 {
                     log_warning_event_on_bound_logger("Database {1} on server {2} does not have the RoundhousE support{0}" +
                         "tables (ScriptsRun, ScriptsRunErrors, Version) created.{0}{0}" +
